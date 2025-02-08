@@ -2,7 +2,7 @@
 
 A web application that combines user activity monitoring, media format management, and library statistics for Tautulli. Provides customizable display formats, real-time status tracking, and section management through an intuitive interface.
 
-![Screenshot of Dashboard](path_to_screenshot.png)
+https://github.com/user-attachments/assets/5dbce30f-26c8-43ca-a085-e5ed102800b9
 
 ## Features
 
