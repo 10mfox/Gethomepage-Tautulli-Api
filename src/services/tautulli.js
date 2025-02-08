@@ -42,6 +42,16 @@ class TautulliService {
     }
   }
 
+  formatDuration(minutes) {
+    if (!minutes) return '';
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    if (hours > 0) {
+      return `${hours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ''}`;
+    }
+    return `${remainingMinutes}m`;
+  }
+
   formatTitle(item, format, type) {
     if (!format || !item) return item.title || '';
     
@@ -50,66 +60,15 @@ class TautulliService {
       title: item.title || '',
       year: item.year || '',
       added_at: this.formatTime(item.added_at),
-      duration: item.duration ? `${Math.floor(item.duration / 60)}m` : '',
+      duration: this.formatDuration(Math.floor(item.duration / 60)),
       ...item
     };
     
     Object.entries(variables).forEach(([key, value]) => {
-      result = result.replace(new RegExp(`\\$\{${key}}`, 'g'), value);
+      result = result.replace(new RegExp(`\\$\{${key}}`, 'g'), value || '');
     });
     
     return result;
-  }
-
-  async getUsers({ order_column = 'friendly_name', order_dir = 'asc', search = '' } = {}) {
-    const data = await this.makeRequest('get_users_table', {
-      order_column,
-      order_dir,
-      search
-    });
-    return data.response.data;
-  }
-
-  async getUserDetails(userId) {
-    const [userResponse, watchTimeResponse] = await Promise.all([
-      this.makeRequest('get_user', { user_id: userId }),
-      this.makeRequest('get_user_watch_time_stats', { user_id: userId, query_days: 'all' })
-    ]);
-    
-    return {
-      ...userResponse.response.data,
-      watch_stats: watchTimeResponse.response.data
-    };
-  }
-
-  async getRecentMedia(type, sectionIds, formats, count = 5) {
-    const ids = Array.isArray(sectionIds) ? sectionIds : [sectionIds];
-    
-    const promises = ids.map(id =>
-      this.makeRequest('get_recently_added', {
-        section_id: id,
-        count
-      })
-    );
-
-    const responses = await Promise.all(promises);
-    let allItems = [];
-
-    responses.forEach((response, index) => {
-      const items = response.response?.data?.recently_added || [];
-      const sectionId = ids[index];
-      
-      items.forEach(item => {
-        allItems.push({
-          ...item,
-          formatted_title: this.formatTitle(item, formats[sectionId]?.title, type),
-          formatted_time: this.formatTime(item.added_at, formats[sectionId]?.added)
-        });
-      });
-    });
-
-    allItems.sort((a, b) => (b.added_at || 0) - (a.added_at || 0));
-    return allItems.slice(0, count);
   }
 }
 

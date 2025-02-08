@@ -4,7 +4,7 @@ const path = require('path');
 const logger = require('./logger');
 const { userRouter } = require('./src/api/users');
 const { mediaRouter } = require('./src/api/media');
-const { libraryRouter } = require('./src/api/libraries');  // Add this line
+const { libraryRouter } = require('./src/api/libraries');
 const { initSettings, getSettings } = require('./src/services/settings');
 
 const app = express();
@@ -31,18 +31,24 @@ function formatTitle(item, format, type) {
       : `${item.title} (${item.year})`;
   }
 
+  const formattedItem = {
+    ...item,
+    duration: formatDuration(parseInt(item.duration || 0))
+  };
+
   let result = format.title;
   const variables = {
-    title: item.title || '',
-    year: item.year || '',
-    grandparent_title: item.grandparent_title || '',
-    parent_media_index: String(item.parent_media_index || '').padStart(2, '0'),
-    media_index: String(item.media_index || '').padStart(2, '0'),
-    ...item
+    title: formattedItem.title || '',
+    year: formattedItem.year || '',
+    grandparent_title: formattedItem.grandparent_title || '',
+    parent_media_index: String(formattedItem.parent_media_index || '').padStart(2, '0'),
+    media_index: String(formattedItem.media_index || '').padStart(2, '0'),
+    duration: formattedItem.duration,
+    ...formattedItem
   };
 
   Object.entries(variables).forEach(([key, value]) => {
-    result = result.replace(new RegExp(`\\$\{${key}}`, 'g'), value);
+    result = result.replace(new RegExp(`\\$\{${key}}`, 'g'), value || '');
   });
 
   return result;
@@ -51,13 +57,26 @@ function formatTitle(item, format, type) {
 function formatTimeDifference(timestamp) {
   if (!timestamp) return 'Never';
   
-  const now = Date.now() / 1000;
-  const diffInSeconds = Math.floor(now - timestamp);
+  const now = Math.floor(Date.now() / 1000);
+  const diffInSeconds = Math.abs(now - timestamp);
   
   if (diffInSeconds < 60) return 'Just Now';
   if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
   if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-  return `${Math.floor(diffInSeconds / 86400)}d ago`;
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 604800)}w ago`;
+  return `${Math.floor(diffInSeconds / 2592000)}mo ago`;
+}
+
+function formatDuration(ms) {
+  if (!ms) return '';
+  const minutes = Math.floor(ms / 60000);
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (hours > 0) {
+    return `${hours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ''}`;
+  }
+  return `${remainingMinutes}m`;
 }
 
 function capitalizeWords(str) {
@@ -79,7 +98,7 @@ app.use((req, res, next) => {
 // API Routes
 app.use('/api/users', userRouter);
 app.use('/api/media', mediaRouter);
-app.use('/api/libraries', libraryRouter);  // Add this line
+app.use('/api/libraries', libraryRouter);
 
 // Recent media endpoints
 app.get('/api/recent/:type(shows|movies)/:sectionId?', async (req, res) => {
@@ -113,7 +132,7 @@ app.get('/api/recent/:type(shows|movies)/:sectionId?', async (req, res) => {
         });
       }
 
-      const response = await axios.get(`${config.baseUrl}`, {
+      const response = await axios.get(`${config.baseUrl}/api/v2`, {
         params: {
           apikey: config.apiKey,
           cmd: 'get_recently_added',
@@ -130,7 +149,6 @@ app.get('/api/recent/:type(shows|movies)/:sectionId?', async (req, res) => {
         section_id: section,
         added: formatTimeDifference(item.added_at),
         title: formatTitle(item, format, type),
-        rating_key: item.rating_key,
         added_at: item.added_at
       })).sort((a, b) => b.added_at - a.added_at);
 
@@ -156,13 +174,16 @@ app.get('/api/recent/:type(shows|movies)/:sectionId?', async (req, res) => {
 
     // Fetch data for all sections
     const promises = configuredSections.map(section =>
-      axios.get(`${config.baseUrl}`, {
+      axios.get(`${config.baseUrl}/api/v2`, {
         params: {
           apikey: config.apiKey,
           cmd: 'get_recently_added',
           section_id: section,
           count: parseInt(count)
         }
+      }).catch(error => {
+        console.error(`Error fetching section ${section}:`, error.message);
+        return { data: { response: { data: { recently_added: [] } } } };
       })
     );
 
@@ -180,7 +201,6 @@ app.get('/api/recent/:type(shows|movies)/:sectionId?', async (req, res) => {
           section_id: section,
           added: formatTimeDifference(item.added_at),
           title: formatTitle(item, format, type),
-          rating_key: item.rating_key,
           added_at: item.added_at
         });
       });

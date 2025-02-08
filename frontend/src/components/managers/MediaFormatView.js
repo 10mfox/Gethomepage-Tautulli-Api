@@ -7,16 +7,12 @@ const formatVariables = {
     { name: '${parent_media_index}', desc: 'Season number' },
     { name: '${media_index}', desc: 'Episode number' },
     { name: '${title}', desc: 'Episode title' },
-    { name: '${summary}', desc: 'Episode summary' },
     { name: '${duration}', desc: 'Duration in minutes' }
   ],
   movies: [
     { name: '${title}', desc: 'Movie title' },
     { name: '${year}', desc: 'Release year' },
-    { name: '${tagline}', desc: 'Movie tagline' },
-    { name: '${genre}', desc: 'Primary genre' },
     { name: '${duration}', desc: 'Duration' },
-    { name: '${studio}', desc: 'Production studio' }
   ]
 };
 

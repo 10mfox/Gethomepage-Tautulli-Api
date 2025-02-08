@@ -2,7 +2,7 @@
 
 A web application that combines user activity monitoring, media format management, and library statistics for Tautulli. Provides customizable display formats, real-time status tracking, and section management through an intuitive interface.
 
-https://github.com/user-attachments/assets/5dbce30f-26c8-43ca-a085-e5ed102800b9
+![Screenshot of Dashboard](path_to_screenshot.png)
 
 ## Features
 
@@ -59,7 +59,6 @@ Shows:
 | ${parent_media_index} | Season number | "01" |
 | ${media_index} | Episode number | "05" |
 | ${title} | Episode title | "Gray Matter" |
-| ${duration} | Runtime | "2h 28m" |
 
 Movies:
 | Variable | Description | Example |
@@ -67,6 +66,8 @@ Movies:
 | ${title} | Movie title | "Inception" |
 | ${year} | Release year | "2010" |
 | ${duration} | Runtime | "2h 28m" |
+| ${genre} | Primary genre | "Sci-Fi" |
+| ${rating} | Rating score | "8.8" |
 
 ## Prerequisites
 
