@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Tautulli Unified Manager - Monitor user activity and manage media formats" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; script-src 'self' https://cdn.tailwindcss.com;">
+    <title>Tautulli Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        @apply bg-gray-900 text-gray-100;
+      }
+      
+      input, select {
+        @apply bg-gray-800 border-gray-700 text-white focus:border-blue-500 focus:ring-blue-500;
+      }
+      
+      button {
+        @apply transition-colors duration-200;
+      }
+
+      /* Loading spinner */
+      .loading-spinner {
+        @apply w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin;
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>

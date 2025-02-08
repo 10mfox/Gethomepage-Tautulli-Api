@@ -1,0 +1,64 @@
+{
+  "userFormats": {
+    "fields": [
+      {
+        "id": "status_message",
+        "template": "${is_watching} ( ${last_played} )"
+      },
+      {
+        "id": "progress",
+        "template": "${progress_time} - ${progress_percent}%"
+      },
+      {
+        "id": "activity",
+        "template": "${media_type} - ${friendly_name} - ${total_plays} plays"
+      }
+    ]
+  },
+  "mediaFormats": {
+    "shows": {
+      "title": "${grandparent_title} - S${parent_media_index}E${media_index} - ${title}",
+      "subtitle": "${summary}",
+      "duration": "${duration}",
+      "added": "relative",
+      "variables": {
+        "grandparent_title": "Show name",
+        "parent_media_index": "Season number (padded)",
+        "media_index": "Episode number (padded)",
+        "title": "Episode title",
+        "summary": "Episode summary",
+        "duration": "Duration in minutes",
+        "content_rating": "Content rating",
+        "added_at": "Date added"
+      }
+    },
+    "movies": {
+      "title": "${title} (${year})",
+      "subtitle": "${tagline}",
+      "info": "${genre} - ${duration}",
+      "added": "relative",
+      "variables": {
+        "title": "Movie title",
+        "year": "Release year",
+        "tagline": "Movie tagline",
+        "genre": "Primary genre",
+        "duration": "Duration in minutes",
+        "studio": "Production studio",
+        "rating": "Rating score",
+        "content_rating": "Content rating",
+        "summary": "Movie summary",
+        "added_at": "Date added"
+      }
+    }
+  },
+  "sections": {
+    "movies": [],
+    "shows": []
+  },
+  "timeFormats": {
+    "relative": "2 hours ago",
+    "absolute": "2024-01-20 15:30",
+    "iso": "2024-01-20T15:30:00Z",
+    "shortdate": "Jan 20"
+  }
+}
