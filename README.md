@@ -59,6 +59,7 @@ Shows:
 | ${parent_media_index} | Season number | "01" |
 | ${media_index} | Episode number | "05" |
 | ${title} | Episode title | "Gray Matter" |
+| ${duration} | Runtime | "2h 28m" |
 
 Movies:
 | Variable | Description | Example |
@@ -66,8 +67,6 @@ Movies:
 | ${title} | Movie title | "Inception" |
 | ${year} | Release year | "2010" |
 | ${duration} | Runtime | "2h 28m" |
-| ${genre} | Primary genre | "Sci-Fi" |
-| ${rating} | Rating score | "8.8" |
 
 ## Prerequisites
 
