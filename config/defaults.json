@@ -23,8 +23,8 @@
       "added": "relative",
       "variables": {
         "grandparent_title": "Show name",
-        "parent_media_index": "Season number (padded)",
-        "media_index": "Episode number (padded)",
+        "parent_media_index": "Season number (always two digits)",
+        "media_index": "Episode number (always two digits)",
         "title": "Episode title",
         "summary": "Episode summary",
         "duration": "Duration in minutes",

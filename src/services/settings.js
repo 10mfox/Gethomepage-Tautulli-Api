@@ -42,21 +42,21 @@ async function getSettings() {
   try {
     const data = await fs.readFile(CONFIG_FILE, 'utf8');
     const settings = JSON.parse(data);
+    
+    // Ensure time_format is preserved
+    const mediaFormats = settings.mediaFormats || {};
+    for (const type in mediaFormats) {
+      for (const sectionId in mediaFormats[type]) {
+        if (!mediaFormats[type][sectionId].time_format) {
+          mediaFormats[type][sectionId].time_format = 'relative';
+        }
+      }
+    }
+    
     return {
       ...defaultSettings,
       ...settings,
-      userFormats: {
-        ...defaultSettings.userFormats,
-        ...settings.userFormats
-      },
-      sections: {
-        ...defaultSettings.sections,
-        ...settings.sections
-      },
-      mediaFormats: {
-        ...defaultSettings.mediaFormats,
-        ...settings.mediaFormats
-      }
+      mediaFormats
     };
   } catch (error) {
     console.error('Error reading settings:', error);
@@ -68,32 +68,28 @@ async function saveSettings(settings) {
   try {
     await fs.mkdir(CONFIG_DIR, { recursive: true });
     
-    const currentSettings = await getSettings();
-    const newSettings = {
-      ...currentSettings,
-      ...settings,
-      userFormats: {
-        ...currentSettings.userFormats,
-        ...settings.userFormats
-      },
-      sections: {
-        ...currentSettings.sections,
-        ...settings.sections
-      },
-      mediaFormats: {
-        ...currentSettings.mediaFormats,
-        ...settings.mediaFormats
+    // Ensure time_format is preserved during save
+    const mediaFormats = settings.mediaFormats || {};
+    for (const type in mediaFormats) {
+      for (const sectionId in mediaFormats[type]) {
+        if (!mediaFormats[type][sectionId].time_format) {
+          mediaFormats[type][sectionId].time_format = 'relative';
+        }
       }
+    }
+    
+    const settingsToSave = {
+      ...settings,
+      mediaFormats
     };
 
     await fs.writeFile(
       CONFIG_FILE,
-      JSON.stringify(newSettings, null, 2),
+      JSON.stringify(settingsToSave, null, 2),
       'utf8'
     );
 
-    console.log('Settings saved successfully');
-    return newSettings;
+    return settingsToSave;
   } catch (error) {
     console.error('Error saving settings:', error);
     throw error;

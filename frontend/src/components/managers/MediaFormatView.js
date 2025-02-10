@@ -1,21 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 
-const formatVariables = {
-  shows: [
-    { name: '${grandparent_title}', desc: 'Show name' },
-    { name: '${parent_media_index}', desc: 'Season number' },
-    { name: '${media_index}', desc: 'Episode number' },
-    { name: '${title}', desc: 'Episode title' },
-    { name: '${duration}', desc: 'Duration in minutes' }
-  ],
-  movies: [
-    { name: '${title}', desc: 'Movie title' },
-    { name: '${year}', desc: 'Release year' },
-    { name: '${duration}', desc: 'Duration' },
-  ]
-};
-
 const MediaFormatView = ({ onError, onSuccess }) => {
   const [sectionTypes, setSectionTypes] = useState([
     { type: 'shows', sections: [] },
@@ -33,15 +18,13 @@ const MediaFormatView = ({ onError, onSuccess }) => {
       const response = await fetch('/api/media/settings');
       const data = await response.json();
       
-      // Transform the data to our internal format
       const types = Object.entries(data.sections || {}).map(([type, ids]) => ({
         type,
         sections: (Array.isArray(ids) ? ids : [ids])
-          .filter(id => id) // Remove empty/null values
+          .filter(id => id)
           .map(id => ({ id: id.toString() }))
       }));
 
-      // Ensure we always have shows and movies sections
       if (!types.find(t => t.type === 'shows')) {
         types.push({ type: 'shows', sections: [] });
       }
@@ -78,21 +61,22 @@ const MediaFormatView = ({ onError, onSuccess }) => {
   };
 
   const handleFormatChange = (type, sectionId, field, value) => {
-    setFormats(prev => ({
-      ...prev,
-      [type]: {
-        ...prev[type],
-        [sectionId]: {
-          ...prev[type]?.[sectionId],
-          [field]: value
-        }
-      }
-    }));
+    setFormats(prev => {
+      const newFormats = { ...prev };
+      if (!newFormats[type]) newFormats[type] = {};
+      if (!newFormats[type][sectionId]) newFormats[type][sectionId] = {};
+      
+      newFormats[type][sectionId] = {
+        ...newFormats[type][sectionId],
+        [field]: value
+      };
+      
+      return newFormats;
+    });
   };
 
   const handleSave = async () => {
     try {
-      // Transform our internal state to API format
       const sections = sectionTypes.reduce((acc, { type, sections }) => {
         const validIds = sections
           .map(s => parseInt(s.id))
@@ -109,7 +93,10 @@ const MediaFormatView = ({ onError, onSuccess }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ sections, formats }),
+        body: JSON.stringify({ 
+          sections, 
+          formats: formats
+        }),
       });
 
       if (!response.ok) {
@@ -117,7 +104,7 @@ const MediaFormatView = ({ onError, onSuccess }) => {
       }
 
       onSuccess();
-      await fetchSettings(); // Refresh settings
+      await fetchSettings();
     } catch (error) {
       console.error('Save error:', error);
       onError('Failed to save media settings');
@@ -181,29 +168,64 @@ const MediaFormatView = ({ onError, onSuccess }) => {
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="block text-sm text-gray-300">Time Format</label>
-                      <select
-                        value={formats[type.type]?.[section.id]?.added || 'relative'}
-                        onChange={(e) => handleFormatChange(type.type, section.id, 'added', e.target.value)}
-                        className="w-full p-2 bg-gray-800 border border-gray-600 rounded"
-                      >
-                        <option value="relative">Relative (e.g., "2 hours ago")</option>
-                        <option value="absolute">Absolute (e.g., "2024-01-20 15:30")</option>
-                        <option value="iso">ISO Format</option>
-                        <option value="shortdate">Short Date (e.g., "Jan 20")</option>
-                      </select>
-                    </div>
-
                     <div className="mt-4 p-3 bg-gray-800 rounded">
                       <p className="text-sm font-medium text-gray-300 mb-2">Available Variables:</p>
                       <div className="grid grid-cols-2 gap-2">
-                        {formatVariables[type.type]?.map((variable) => (
-                          <div key={variable.name} className="text-sm">
-                            <code className="text-blue-300">{variable.name}</code>
-                            <span className="text-gray-400 ml-2">- {variable.desc}</span>
-                          </div>
-                        ))}
+                        {type.type === 'shows' ? (
+                          <>
+                            <div className="text-sm">
+                              <code className="text-blue-300">${'{grandparent_title}'}</code>
+                              <span className="text-gray-400 ml-2">- Show name</span>
+                            </div>
+                            <div className="text-sm">
+                              <code className="text-blue-300">${'{parent_media_index}'}</code>
+                              <span className="text-gray-400 ml-2">- Season number</span>
+                            </div>
+                            <div className="text-sm">
+                              <code className="text-blue-300">${'{media_index}'}</code>
+                              <span className="text-gray-400 ml-2">- Episode number</span>
+                            </div>
+                            <div className="text-sm">
+                              <code className="text-blue-300">${'{title}'}</code>
+                              <span className="text-gray-400 ml-2">- Episode title</span>
+                            </div>
+                            <div className="text-sm">
+                              <code className="text-blue-300">${'{duration}'}</code>
+                              <span className="text-gray-400 ml-2">- Runtime</span>
+                            </div>
+                            <div className="text-sm">
+                              <code className="text-blue-300">${'{content_rating}'}</code>
+                              <span className="text-gray-400 ml-2">- Content rating</span>
+                            </div>
+                            <div className="text-sm">
+                              <code className="text-blue-300">${'{video_resolution}'}</code>
+                              <span className="text-gray-400 ml-2">- Video quality</span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-sm">
+                              <code className="text-blue-300">${'{title}'}</code>
+                              <span className="text-gray-400 ml-2">- Movie title</span>
+                            </div>
+                            <div className="text-sm">
+                              <code className="text-blue-300">${'{year}'}</code>
+                              <span className="text-gray-400 ml-2">- Release year</span>
+                            </div>
+                            <div className="text-sm">
+                              <code className="text-blue-300">${'{duration}'}</code>
+                              <span className="text-gray-400 ml-2">- Runtime</span>
+                            </div>
+                            <div className="text-sm">
+                              <code className="text-blue-300">${'{content_rating}'}</code>
+                              <span className="text-gray-400 ml-2">- Content rating</span>
+                            </div>
+                            <div className="text-sm">
+                              <code className="text-blue-300">${'{video_resolution}'}</code>
+                              <span className="text-gray-400 ml-2">- Video quality</span>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   </>

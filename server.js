@@ -17,43 +17,6 @@ const config = {
 };
 
 // Format helper functions
-function formatTime(ms) {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, '0')}`;
-}
-
-function formatTitle(item, format, type) {
-  if (!format?.title) {
-    return type === 'shows' 
-      ? `${item.grandparent_title} - S${String(item.parent_media_index).padStart(2, '0')}E${String(item.media_index).padStart(2, '0')} - ${item.title}`
-      : `${item.title} (${item.year})`;
-  }
-
-  const formattedItem = {
-    ...item,
-    duration: formatDuration(parseInt(item.duration || 0))
-  };
-
-  let result = format.title;
-  const variables = {
-    title: formattedItem.title || '',
-    year: formattedItem.year || '',
-    grandparent_title: formattedItem.grandparent_title || '',
-    parent_media_index: String(formattedItem.parent_media_index || '').padStart(2, '0'),
-    media_index: String(formattedItem.media_index || '').padStart(2, '0'),
-    duration: formattedItem.duration,
-    ...formattedItem
-  };
-
-  Object.entries(variables).forEach(([key, value]) => {
-    result = result.replace(new RegExp(`\\$\{${key}}`, 'g'), value || '');
-  });
-
-  return result;
-}
-
 function formatTimeDifference(timestamp) {
   if (!timestamp) return 'Never';
   
@@ -79,9 +42,39 @@ function formatDuration(ms) {
   return `${remainingMinutes}m`;
 }
 
-function capitalizeWords(str) {
-  if (!str) return '';
-  return str.replace(/\b\w/g, char => char.toUpperCase());
+function formatTitle(item, format, type) {
+  if (!format?.title) {
+    return type === 'shows' 
+      ? `${item.grandparent_title} - S${String(item.parent_media_index).padStart(2, '0')}E${String(item.media_index).padStart(2, '0')} - ${item.title}`
+      : `${item.title} (${item.year})`;
+  }
+
+  const formattedItem = {
+    ...item,
+    duration: formatDuration(parseInt(item.duration || 0)),
+    video_resolution: item.media_info?.[0]?.video_full_resolution || item.media_info?.[0]?.video_resolution || '',
+    parent_media_index: String(item.parent_media_index || '').padStart(2, '0'),
+    media_index: String(item.media_index || '').padStart(2, '0')
+  };
+
+  let result = format.title;
+  const variables = {
+    title: formattedItem.title || '',
+    year: formattedItem.year || '',
+    grandparent_title: formattedItem.grandparent_title || '',
+    parent_media_index: formattedItem.parent_media_index,
+    media_index: formattedItem.media_index,
+    duration: formattedItem.duration,
+    content_rating: formattedItem.content_rating || '',
+    video_resolution: formattedItem.video_resolution || '',
+    ...formattedItem
+  };
+
+  Object.entries(variables).forEach(([key, value]) => {
+    result = result.replace(new RegExp(`\\$\{${key}}`, 'g'), value || '');
+  });
+
+  return result;
 }
 
 // Middleware
@@ -99,6 +92,24 @@ app.use((req, res, next) => {
 app.use('/api/users', userRouter);
 app.use('/api/media', mediaRouter);
 app.use('/api/libraries', libraryRouter);
+
+// Helper function to get metadata for a specific item
+async function getItemMetadata(ratingKey, baseUrl, apiKey) {
+  try {
+    const metadata = await axios.get(`${baseUrl}/api/v2`, {
+      params: {
+        apikey: apiKey,
+        cmd: 'get_metadata',
+        rating_key: ratingKey
+      }
+    });
+    
+    return metadata.data?.response?.data;
+  } catch (error) {
+    console.error(`Error fetching metadata for item ${ratingKey}:`, error.message);
+    return null;
+  }
+}
 
 // Recent media endpoints
 app.get('/api/recent/:type(shows|movies)/:sectionId?', async (req, res) => {
@@ -142,21 +153,29 @@ app.get('/api/recent/:type(shows|movies)/:sectionId?', async (req, res) => {
       });
 
       const items = response.data?.response?.data?.recently_added || [];
-      const format = formats?.[type]?.[section];
       
-      const formattedItems = items.map(item => ({
-        media_type: type,
-        section_id: section,
-        added: formatTimeDifference(item.added_at),
-        title: formatTitle(item, format, type),
-        added_at: item.added_at
-      })).sort((a, b) => b.added_at - a.added_at);
+      const itemsWithMetadata = await Promise.all(
+        items.map(async (item) => {
+          const metadataInfo = await getItemMetadata(item.rating_key, config.baseUrl, config.apiKey);
+          const added_at = parseInt(item.added_at);
+
+          return {
+            media_type: type,
+            section_id: section.toString(), // Ensure section_id is a string
+            title: formatTitle(item, formats?.[type]?.[section], type),
+            content_rating: metadataInfo?.content_rating || '',
+            video_resolution: metadataInfo?.media_info?.[0]?.video_full_resolution || metadataInfo?.media_info?.[0]?.video_resolution || '',
+            added_at_relative: formatTimeDifference(added_at),
+            added_at_short: new Date(added_at * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          };
+        })
+      );
 
       return res.json({
         response: {
           result: 'success',
           message: '',
-          data: formattedItems,
+          data: itemsWithMetadata,
           section: section
         }
       });
@@ -172,48 +191,79 @@ app.get('/api/recent/:type(shows|movies)/:sectionId?', async (req, res) => {
       });
     }
 
-    // Fetch data for all sections
+    // Make the request number larger to ensure we get enough items after sorting
+    const requestCount = parseInt(count) * configuredSections.length;
+
     const promises = configuredSections.map(section =>
       axios.get(`${config.baseUrl}/api/v2`, {
         params: {
           apikey: config.apiKey,
           cmd: 'get_recently_added',
           section_id: section,
-          count: parseInt(count)
+          count: requestCount
         }
       }).catch(error => {
         console.error(`Error fetching section ${section}:`, error.message);
-        return { data: { response: { data: { recently_added: [] } } } };
+        return { 
+          data: { 
+            response: { 
+              data: { 
+                recently_added: [],
+                section_id: section  // Preserve section ID even in error case
+              } 
+            } 
+          },
+          section_id: section // Additional backup of section ID
+        };
       })
     );
 
+    // Get items from all sections first
     const responses = await Promise.all(promises);
     
-    let allItems = [];
+    // Collect all items and add section info
+    let allRecentItems = [];
     responses.forEach((response, index) => {
       const items = response.data?.response?.data?.recently_added || [];
-      const section = configuredSections[index];
-      const format = formats?.[type]?.[section];
-      
+      const section = configuredSections[index]; // Get section from original array
       items.forEach(item => {
-        allItems.push({
-          media_type: type,
-          section_id: section,
-          added: formatTimeDifference(item.added_at),
-          title: formatTitle(item, format, type),
-          added_at: item.added_at
+        allRecentItems.push({
+          ...item,
+          section_id: section.toString(), // Ensure section_id is a string and always present
+          format: formats?.[type]?.[section]
         });
       });
     });
 
-    allItems.sort((a, b) => b.added_at - a.added_at);
-    allItems = allItems.slice(0, parseInt(count));
+    // Sort all items by added_at before processing metadata
+    allRecentItems.sort((a, b) => parseInt(b.added_at) - parseInt(a.added_at));
+
+    // Take top N items
+    allRecentItems = allRecentItems.slice(0, parseInt(count));
+
+    // Now get metadata for only the items we need
+    const itemsWithMetadata = await Promise.all(
+      allRecentItems.map(async (item) => {
+        const metadataInfo = await getItemMetadata(item.rating_key, config.baseUrl, config.apiKey);
+        const added_at = parseInt(item.added_at);
+
+        return {
+          media_type: type,
+          section_id: item.section_id, // Section ID is already a string from above
+          title: formatTitle(item, item.format, type),
+          content_rating: metadataInfo?.content_rating || '',
+          video_resolution: metadataInfo?.media_info?.[0]?.video_full_resolution || metadataInfo?.media_info?.[0]?.video_resolution || '',
+          added_at_relative: formatTimeDifference(added_at),
+          added_at_short: new Date(added_at * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        };
+      })
+    );
 
     res.json({
       response: {
         result: 'success',
         message: '',
-        data: allItems,
+        data: itemsWithMetadata,
         sections: configuredSections
       }
     });

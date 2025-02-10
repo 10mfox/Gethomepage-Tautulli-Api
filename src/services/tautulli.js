@@ -61,6 +61,8 @@ class TautulliService {
       year: item.year || '',
       added_at: this.formatTime(item.added_at),
       duration: this.formatDuration(Math.floor(item.duration / 60)),
+      parent_media_index: String(item.parent_media_index || '').padStart(2, '0'),
+      media_index: String(item.media_index || '').padStart(2, '0'),
       ...item
     };
     

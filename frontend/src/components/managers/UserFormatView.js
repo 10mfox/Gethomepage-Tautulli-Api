@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 
 const UserFormatView = ({ onError, onSuccess }) => {
-  const [fields, setFields] = useState([
-    { id: 'name', template: '${friendly_name} ${last_seen_formatted}' },
-    { id: 'watched', template: '${is_watching} - ${media_type} ( ${last_played} ) ${progress_time}' },
-    { id: 'test', template: '${total_plays}' }
-  ]);
+  const [fields, setFields] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
 
   const fetchSettings = async () => {
     try {
@@ -14,14 +15,27 @@ const UserFormatView = ({ onError, onSuccess }) => {
       if (!response.ok) throw new Error('Failed to fetch settings');
       const data = await response.json();
       setFields(data.fields || []);
+      setLoading(false);
     } catch (error) {
-      onError('Failed to load settings');
+      console.error('Failed to load settings:', error);
+      onError('Failed to load user settings');
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchSettings();
-  }, []);
+  const addField = () => {
+    setFields([...fields, { id: '', template: '' }]);
+  };
+
+  const removeField = (index) => {
+    setFields(fields.filter((_, i) => i !== index));
+  };
+
+  const updateField = (index, key, value) => {
+    const newFields = [...fields];
+    newFields[index] = { ...newFields[index], [key]: value };
+    setFields(newFields);
+  };
 
   const handleSave = async () => {
     try {
@@ -32,91 +46,108 @@ const UserFormatView = ({ onError, onSuccess }) => {
       });
 
       if (!response.ok) throw new Error('Failed to save settings');
-      const data = await response.json();
-      if (data.success) {
-        onSuccess();
-      } else {
-        throw new Error('Failed to save settings');
-      }
+      onSuccess();
+      await fetchSettings();
     } catch (error) {
-      onError('Failed to save settings');
+      console.error('Save error:', error);
+      onError('Failed to save user settings');
     }
   };
 
-  const handleAddField = () => {
-    setFields([...fields, { id: '', template: '' }]);
-  };
-
-  const handleRemoveField = (index) => {
-    setFields(fields.filter((_, i) => i !== index));
-  };
-
-  const handleFieldChange = (index, key, value) => {
-    const newFields = [...fields];
-    newFields[index] = { ...newFields[index], [key]: value };
-    setFields(newFields);
-  };
-
-  const variables = [
-    ['${friendly_name}', 'Display name'],
-    ['${progress_time}', 'Progress timestamp'],
-    ['${last_played}', 'Currently watching/last watched'],
-    ['${total_plays}', 'Total play count'],
-    ['${media_type}', 'Type of media'],
-    ['${is_watching}', 'Current status'],
-    ['${progress_percent}', 'Current progress'],
-    ['${last_seen_formatted}', 'Last activity timestamp']
-  ];
+  if (loading) {
+    return <div className="text-center text-gray-400">Loading settings...</div>;
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="space-y-4">
-        {fields.map((field, index) => (
-          <div key={index} className="flex gap-3 bg-gray-700/50 rounded-lg">
-            <input
-              type="text"
-              value={field.id}
-              onChange={(e) => handleFieldChange(index, 'id', e.target.value)}
-              className="flex-1 p-3 bg-gray-900 rounded-l border-0 text-white"
-              placeholder="Field Name"
-            />
-            <input
-              type="text"
-              value={field.template}
-              onChange={(e) => handleFieldChange(index, 'template', e.target.value)}
-              className="flex-[2] p-3 bg-gray-900 border-0 text-white"
-              placeholder="Template"
-            />
-            <button
-              onClick={() => handleRemoveField(index)}
-              className="px-4 text-red-400 hover:text-red-300 flex items-center"
-            >
-              <Trash2 className="h-5 w-5" />
-            </button>
-          </div>
-        ))}
-
-        <button
-          onClick={handleAddField}
-          className="text-blue-400 hover:text-blue-300 flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Field
-        </button>
-      </div>
-
-      <div>
-        <h3 className="text-xl font-semibold text-white mb-4">Available Variables</h3>
-        <div className="grid grid-cols-2 gap-4">
-          {variables.map(([variable, desc]) => (
-            <div key={variable} className="flex items-center gap-2">
-              <code className="bg-gray-900 px-2 py-1 rounded text-blue-400 font-mono">
-                {variable}
-              </code>
-              <span className="text-gray-400">{desc}</span>
-            </div>
-          ))}
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-white">
+            User Display Fields
+          </h3>
+          <button
+            onClick={addField}
+            className="flex items-center gap-2 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" />
+            Add Field
+          </button>
         </div>
+
+        {fields.length === 0 ? (
+          <div className="p-4 text-center text-gray-400 border border-gray-700 rounded-lg">
+            No display fields configured. Click "Add Field" to begin.
+          </div>
+        ) : (
+          fields.map((field, index) => (
+            <div key={index} className="p-4 bg-gray-700 rounded-lg space-y-4">
+              <div className="flex items-center gap-4">
+                <input
+                  type="text"
+                  value={field.id}
+                  onChange={(e) => updateField(index, 'id', e.target.value)}
+                  className="flex-1 p-2 bg-gray-800 border border-gray-600 rounded"
+                  placeholder="Field Name"
+                />
+                <button
+                  onClick={() => removeField(index)}
+                  className="p-2 text-red-400 hover:text-red-300"
+                  title="Remove Field"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm text-gray-300">Display Format</label>
+                <input
+                  value={field.template}
+                  onChange={(e) => updateField(index, 'template', e.target.value)}
+                  className="w-full p-2 bg-gray-800 border border-gray-600 rounded"
+                  placeholder="Enter display format template"
+                />
+              </div>
+
+              <div className="mt-4 p-3 bg-gray-800 rounded">
+                <p className="text-sm font-medium text-gray-300 mb-2">Available Variables:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="text-sm">
+                    <code className="text-blue-300">${'{friendly_name}'}</code>
+                    <span className="text-gray-400 ml-2">- Display name</span>
+                  </div>
+                  <div className="text-sm">
+                    <code className="text-blue-300">${'{total_plays}'}</code>
+                    <span className="text-gray-400 ml-2">- Total play count</span>
+                  </div>
+                  <div className="text-sm">
+                    <code className="text-blue-300">${'{last_played}'}</code>
+                    <span className="text-gray-400 ml-2">- Currently watching/last watched</span>
+                  </div>
+                  <div className="text-sm">
+                    <code className="text-blue-300">${'{media_type}'}</code>
+                    <span className="text-gray-400 ml-2">- Type of media</span>
+                  </div>
+                  <div className="text-sm">
+                    <code className="text-blue-300">${'{progress_percent}'}</code>
+                    <span className="text-gray-400 ml-2">- Current progress</span>
+                  </div>
+                  <div className="text-sm">
+                    <code className="text-blue-300">${'{progress_time}'}</code>
+                    <span className="text-gray-400 ml-2">- Progress timestamp</span>
+                  </div>
+                  <div className="text-sm">
+                    <code className="text-blue-300">${'{is_watching}'}</code>
+                    <span className="text-gray-400 ml-2">- Current status</span>
+                  </div>
+                  <div className="text-sm">
+                    <code className="text-blue-300">${'{last_seen_formatted}'}</code>
+                    <span className="text-gray-400 ml-2">- Last activity timestamp</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       <button
