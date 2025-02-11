@@ -78,19 +78,13 @@ Movies:
 
 ## Quick Start
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/tautulli-unified-manager.git
-cd tautulli-unified-manager
-```
-
-2. Create a docker-compose.yml:
+1. Create a docker-compose.yml:
 ```yaml
 version: '3'
 services:
   tautulli-manager:
-    image: tautulli-unified-manager:latest
-    container_name: tautulli-manager
+    image: ghcr.io/10mfox/gethomepage-tautulli-api:latest
+    container_name: tautulli-api-manager
     environment:
       - TAUTULLI_CUSTOM_PORT=3010
       - TAUTULLI_BASE_URL=http://your-tautulli-host:8181
@@ -102,12 +96,12 @@ services:
     restart: unless-stopped
 ```
 
-3. Build and start:
+2. Build and start:
 ```bash
 docker compose up -d
 ```
 
-4. Access the web interface at `http://localhost:3010`
+3. Access the web interface at `http://localhost:3010`
 
 ## API Endpoints
 
@@ -148,7 +142,7 @@ Here's an example services.yaml configuration for integrating with Homepage:
         id: list
         widget:
           type: customapi
-          url: http://{{HOMEPAGE_VAR_LOCAL_IP}}:3010/api/recent/movies/2
+          url: http://your-tautulli-host:3010/api/recent/movies/2
           method: GET
           display: list
           mappings:
@@ -167,7 +161,7 @@ Here's an example services.yaml configuration for integrating with Homepage:
          id: list
          widget:
            type: customapi
-           url: http://{{HOMEPAGE_VAR_LOCAL_IP}}:3010/api/recent/shows/3
+           url: http://your-tautulli-host:3010/api/recent/shows/3
            method: GET
            display: list
            mappings:
@@ -185,7 +179,7 @@ Here's an example services.yaml configuration for integrating with Homepage:
     - Media Count:
          widgets:
            - type: customapi
-             url: http://{{HOMEPAGE_VAR_LOCAL_IP}}:3010/api/libraries
+             url: http://your-tautulli-host:3010/api/libraries
              method: GET
              display: block
              mappings:
@@ -196,7 +190,7 @@ Here's an example services.yaml configuration for integrating with Homepage:
                format: numbers 
                label: Movies
            - type: customapi
-             url: http://{{HOMEPAGE_VAR_LOCAL_IP}}:3010/api/libraries
+             url: http://your-tautulli-host:3010/api/libraries
              method: GET
              display: block
              mappings:
@@ -223,7 +217,7 @@ Here's an example services.yaml configuration for integrating with Homepage:
          id: list2
          widgets:
            - type: customapi
-             url: http://{{HOMEPAGE_VAR_LOCAL_IP}}:3010/api/users
+             url: http://your-tautulli-host:3010/api/users
              method: GET
              display: list
              mappings:
