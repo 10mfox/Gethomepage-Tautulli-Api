@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Film } from 'lucide-react';
+import { Users, Film, Layout } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import UserFormatView from './managers/UserFormatView';
 import MediaFormatView from './managers/MediaFormatView';
+import SectionManager from './managers/SectionManager';
 
 const FormatManager = () => {
   const [activeView, setActiveView] = useState('user');
@@ -11,7 +12,8 @@ const FormatManager = () => {
 
   const tabs = [
     { id: 'user', label: 'User Display', icon: Users },
-    { id: 'media', label: 'Media Display', icon: Film }
+    { id: 'media', label: 'Media Display', icon: Film },
+    { id: 'sections', label: 'Section Manager', icon: Layout }
   ];
 
   const handleError = (message) => {
@@ -60,10 +62,14 @@ const FormatManager = () => {
         </div>
 
         <div className="p-6">
-          {activeView === 'user' ? (
+          {activeView === 'user' && (
             <UserFormatView onError={handleError} onSuccess={handleSuccess} />
-          ) : (
+          )}
+          {activeView === 'media' && (
             <MediaFormatView onError={handleError} onSuccess={handleSuccess} />
+          )}
+          {activeView === 'sections' && (
+            <SectionManager onError={handleError} onSuccess={handleSuccess} />
           )}
         </div>
       </div>
