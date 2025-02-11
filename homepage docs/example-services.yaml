@@ -1,0 +1,94 @@
+- Recently Added:
+     - Movies:
+        icon: mdi-filmstrip
+        id: list
+        widget:
+          type: customapi
+          url: http://your-tautulli-host:3010/api/recent/movies/2
+          method: GET
+          display: list
+          mappings:
+            - field:
+                response:
+                  data:
+                    0: title
+              additionalField:
+                field:
+                  response:
+                    data:
+                      0: added_at_short
+                color: theme
+     - Shows:
+         icon: mdi-television-classic
+         id: list
+         widget:
+           type: customapi
+           url: http://your-tautulli-host:3010/api/recent/shows/3
+           method: GET
+           display: list
+           mappings:
+              - field:
+                  response:
+                    data:
+                      0: title
+                additionalField:
+                  field:
+                    response:
+                      data:
+                        0: added_at_short
+                  color: theme
+- Media Count:
+    - Media Count:
+         widgets:
+           - type: customapi
+             url: http://your-tautulli-host:3010/api/libraries
+             method: GET
+             display: block
+             mappings:
+             - field:
+                 response:
+                   data:
+                     0: count
+               format: numbers 
+               label: Movies
+           - type: customapi
+             url: http://your-tautulli-host:3010/api/libraries
+             method: GET
+             display: block
+             mappings:
+             - field:
+                 response:
+                   data:
+                     1: count
+               format: numbers
+               label: Shows
+             - field:
+                 response:
+                   data:
+                     1: parent_count
+               format: numbers
+               label: Seasons
+             - field:
+                 response:
+                   data:
+                     1: child_count
+               format: numbers
+               label: Episodes
+- Activity:                     
+    - Activity:
+         id: list
+         widgets:
+           - type: customapi
+             url: http://your-tautulli-host:3010/api/users
+             method: GET
+             display: list
+             mappings:
+               - field:
+                   response:
+                     data:
+                       0: name
+                 additionalField:
+                   field:
+                     response:
+                       data:
+                         0: watched

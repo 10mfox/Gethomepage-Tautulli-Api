@@ -1,0 +1,19 @@
+/*==================================
+  LIST STYLES
+==================================*/
+/* Recently Added/Activity Section */
+#list > div > div.relative.flex.flex-row.w-full.service-container > div > div {
+  display: block;
+  text-align: right;
+}
+
+
+#list > div > div.relative.flex.flex-row.w-full.service-container > div > div > div.flex.flex-row.text-right > div:nth-child(1) {
+  text-align: right;
+  margin-left: .5rem;
+}
+
+#list > div > div.relative.flex.flex-row.w-full.service-container > div > div > div.flex.flex-row.text-right > div:nth-child(2) {
+  text-align: left;
+  margin-left: auto; 
+}
