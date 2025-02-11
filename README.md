@@ -2,7 +2,7 @@
 
 A web application that combines user activity monitoring, media format management, and library statistics for Tautulli. Provides customizable display formats, real-time status tracking, and section management through an intuitive interface.
 
-![Screenshot of Dashboard](path_to_screenshot.png)
+![Homelab (18)](https://github.com/user-attachments/assets/0d8a31e7-59c5-4c19-aa7f-5aa4b9157e82)
 
 ## Features
 
