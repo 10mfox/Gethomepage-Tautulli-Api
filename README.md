@@ -214,7 +214,7 @@ Here's an example services.yaml configuration for integrating with Homepage:
                label: Episodes
 - Activity:                     
     - Activity:
-         id: list2
+         id: list
          widgets:
            - type: customapi
              url: http://your-tautulli-host:3010/api/users
@@ -230,51 +230,6 @@ Here's an example services.yaml configuration for integrating with Homepage:
                      response:
                        data:
                          0: watched
-               - field:
-                   response:
-                     data:
-                       1: name
-                 additionalField:
-                   field:
-                     response:
-                       data:
-                         1: watched
-               - field:
-                   response:
-                     data:
-                       2: name
-                 additionalField:
-                   field:
-                     response:
-                       data:
-                         2: watched
-               - field:
-                   response:
-                     data:
-                       3: name
-                 additionalField:
-                   field:
-                     response:
-                       data:
-                         3: watched
-               - field:
-                   response:
-                     data:
-                       4: name
-                 additionalField:
-                   field:
-                     response:
-                       data:
-                         4: watched
-               - field:
-                   response:
-                     data:
-                       5: name
-                 additionalField:
-                   field:
-                     response:
-                       data:
-                         5: watched
 ```
 
 Example API responses:
