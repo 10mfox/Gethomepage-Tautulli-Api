@@ -7,6 +7,7 @@ A web application that combines user activity monitoring, media format managemen
 ## Features
 
 ### User Activity Management
+
 - Real-time status updates for currently watching users
 - Customizable user status messages and display formats
 - Progress tracking with timestamps and percentages
@@ -16,6 +17,7 @@ A web application that combines user activity monitoring, media format managemen
 - Online/offline status indicators
 
 ### Media Management
+
 - Section-based organization for movies and TV shows
 - Customizable display formats for each media type
 - Recently added content tracking per section
@@ -24,6 +26,7 @@ A web application that combines user activity monitoring, media format managemen
 - Individual section statistics
 
 ### Library Statistics
+
 - Complete library section overview
 - Movie count per library section
 - TV show, season, and episode counts
@@ -31,6 +34,7 @@ A web application that combines user activity monitoring, media format managemen
 - Sorted by section ID for easy reference
 
 ### General Features
+
 - Dark mode responsive UI optimized for all devices
 - Persistent configuration storage
 - Real-time updates and live status indicators
@@ -79,8 +83,9 @@ Movies:
 ## Quick Start
 
 1. Create a docker-compose.yml:
+
 ```yaml
-version: '3'
+version: "3"
 services:
   tautulli-manager:
     image: ghcr.io/10mfox/gethomepage-tautulli-api:latest
@@ -97,6 +102,7 @@ services:
 ```
 
 2. Build and start:
+
 ```bash
 docker compose up -d
 ```
@@ -106,11 +112,13 @@ docker compose up -d
 ## API Endpoints
 
 ### User Management
+
 ```
 GET /api/users
 ```
 
 ### Media Management
+
 ```
 GET /api/recent/movies
 GET /api/recent/shows
@@ -119,25 +127,36 @@ GET /api/recent/shows/:sectionId
 ```
 
 ### Library Management
+
 ```
 GET /api/libraries
 ```
 
 ### Dashboard
+
 ```
 GET /api/config
 GET /api/health
 ```
 
-### Example Homepage Integration
+---
 
-## Please Do Not Copy And Paste this may not work for you it is just a guide
+## Example [Homepage](https://gethomepage.dev/) Integration
 
-Here's an example services.yaml configuration for integrating with Homepage:
+### PLEASE DO NOT COPY AND PASTE - THIS MAY NOT WORK FOR YOU - THIS IS JUST A EXAMPLE GUIDE
+
+Here's an example `services.yaml` along with `custom.css` configuration
+for integrating with [Homepage](https://gethomepage.dev/):
+
+### Recently Added Card
+
+<img src="screenshots/Recently.png" alt="Recently Added">
+
+`services.yaml`
 
 ```yaml
 - Recently Added:
-     - Movies:
+    - Movies:
         icon: mdi-filmstrip
         id: list
         widget:
@@ -156,85 +175,219 @@ Here's an example services.yaml configuration for integrating with Homepage:
                     data:
                       0: added_at_short
                 color: theme
-     - Shows:
-         icon: mdi-television-classic
-         id: list
-         widget:
-           type: customapi
-           url: http://your-tautulli-host:3010/api/recent/shows/3
-           method: GET
-           display: list
-           mappings:
+    - Shows:
+        icon: mdi-television-classic
+        id: list
+        widget:
+          type: customapi
+          url: http://your-tautulli-host:3010/api/recent/shows/3
+          method: GET
+          display: list
+          mappings:
+            - field:
+                response:
+                  data:
+                    0: title
+              additionalField:
+                field:
+                  response:
+                    data:
+                      0: added_at_short
+                color: theme
+```
+
+`custom.css`
+
+```css
+/*==================================
+  LIST STYLES
+==================================*/
+
+#list > div > div.relative.flex.flex-row.w-full.service-container > div > div {
+  display: block;
+  text-align: right;
+}
+
+#list
+  > div
+  > div.relative.flex.flex-row.w-full.service-container
+  > div
+  > div
+  > div.flex.flex-row.text-right
+  > div:nth-child(1) {
+  text-align: right;
+  margin-left: 0.5rem;
+}
+
+#list
+  > div
+  > div.relative.flex.flex-row.w-full.service-container
+  > div
+  > div
+  > div.flex.flex-row.text-right
+  > div:nth-child(2) {
+  text-align: left;
+  margin-left: auto;
+}
+```
+
+### User Activities Card
+
+<img src="screenshots/Activity.png" alt="User Activity">
+
+`services.yaml`
+
+```yaml
+- Activity:
+    - Activity:
+        id: list
+        widgets:
+          - type: customapi
+            url: http://your-tautulli-host:3010/api/users
+            method: GET
+            display: list
+            mappings:
               - field:
                   response:
                     data:
-                      0: title
+                      0: name
                 additionalField:
                   field:
                     response:
                       data:
-                        0: added_at_short
-                  color: theme
-- Media Count:
-    - Media Count:
-         widgets:
-           - type: customapi
-             url: http://your-tautulli-host:3010/api/libraries
-             method: GET
-             display: block
-             mappings:
-             - field:
-                 response:
-                   data:
-                     0: count
-               format: numbers 
-               label: Movies
-           - type: customapi
-             url: http://your-tautulli-host:3010/api/libraries
-             method: GET
-             display: block
-             mappings:
-             - field:
-                 response:
-                   data:
-                     1: count
-               format: numbers
-               label: Shows
-             - field:
-                 response:
-                   data:
-                     1: parent_count
-               format: numbers
-               label: Seasons
-             - field:
-                 response:
-                   data:
-                     1: child_count
-               format: numbers
-               label: Episodes
-- Activity:                     
-    - Activity:
-         id: list
-         widgets:
-           - type: customapi
-             url: http://your-tautulli-host:3010/api/users
-             method: GET
-             display: list
-             mappings:
-               - field:
-                   response:
-                     data:
-                       0: name
-                 additionalField:
-                   field:
-                     response:
-                       data:
-                         0: watched
+                        0: watched
+              - field:
+                  response:
+                    data:
+                      1: name
+                additionalField:
+                  field:
+                    response:
+                      data:
+                        1: watched
+              - field:
+                  response:
+                    data:
+                      2: name
+                additionalField:
+                  field:
+                    response:
+                      data:
+                        2: watched
+              - field:
+                  response:
+                    data:
+                      3: name
+                additionalField:
+                  field:
+                    response:
+                      data:
+                        3: watched
+              - field:
+                  response:
+                    data:
+                      4: name
+                additionalField:
+                  field:
+                    response:
+                      data:
+                        4: watched
+              - field:
+                  response:
+                    data:
+                      5: name
+                additionalField:
+                  field:
+                    response:
+                      data:
+                        5: watched
 ```
 
-Example API responses:
+`custom.css`
+
+```css
+/*==================================
+  LIST STYLES
+==================================*/
+
+#list > div > div.relative.flex.flex-row.w-full.service-container > div > div {
+  display: block;
+  text-align: right;
+}
+
+#list
+  > div
+  > div.relative.flex.flex-row.w-full.service-container
+  > div
+  > div
+  > div.flex.flex-row.text-right
+  > div:nth-child(1) {
+  text-align: right;
+  margin-left: 0.5rem;
+}
+
+#list
+  > div
+  > div.relative.flex.flex-row.w-full.service-container
+  > div
+  > div
+  > div.flex.flex-row.text-right
+  > div:nth-child(2) {
+  text-align: left;
+  margin-left: auto;
+}
+```
+
+### Media Count Card
+
+<img src="screenshots/Count.png" alt="Media Count">
+
+`services.yaml`
+
+```yaml
+- Media Count:
+    - Media Count:
+        widgets:
+          - type: customapi
+            url: http://your-tautulli-host:3010/api/libraries
+            method: GET
+            display: block
+            mappings:
+              - field:
+                  response:
+                    data:
+                      0: count
+                format: numbers
+                label: Movies
+          - type: customapi
+            url: http://your-tautulli-host:3010/api/libraries
+            method: GET
+            display: block
+            mappings:
+              - field:
+                  response:
+                    data:
+                      1: count
+                format: numbers
+                label: Shows
+              - field:
+                  response:
+                    data:
+                      1: parent_count
+                format: numbers
+                label: Seasons
+              - field:
+                  response:
+                    data:
+                      1: child_count
+                format: numbers
+                label: Episodes
+```
+
+### Example API responses
 
 Movies Response:
+
 ```json
 {
   "response": {
@@ -257,6 +410,7 @@ Movies Response:
 ```
 
 Shows Response:
+
 ```json
 {
   "response": {
@@ -279,10 +433,13 @@ Shows Response:
 ```
 
 ### Volume Mounts
+
 - `/app/config`: Persistent configuration storage
 
 ### Health Checks
+
 The container includes health checks to monitor:
+
 - Web server availability
 - Tautulli connection status
 - Configuration persistence
