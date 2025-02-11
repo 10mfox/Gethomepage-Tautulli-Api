@@ -444,10 +444,6 @@ The container includes health checks to monitor:
 - Tautulli connection status
 - Configuration persistence
 
-## License
-
-MIT License - see LICENSE file for details.
-
 ## Note
 
 This project is not affiliated with Tautulli or Plex Inc.
