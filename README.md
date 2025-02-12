@@ -54,6 +54,7 @@ User Format Variables:
 | ${progress_time} | Progress timestamp | "1:15:30 / 2:30:00" |
 | ${is_watching} | Current status | "Watching/Idle" |
 | ${last_seen_formatted} | Last activity timestamp | "2 hours ago" |
+| ${stream_container_decision} | Container Steam Type | "Transcode or Direct Play" |
 
 Media Format Variables:
 Shows:
@@ -63,15 +64,19 @@ Shows:
 | ${parent_media_index} | Season number | "01" |
 | ${media_index} | Episode number | "05" |
 | ${title} | Episode title | "Gray Matter" |
+| ${duration} | Runtime | "1h 51m" |
+| ${content_rating} | Content Rating | "PG13, R" |
+| ${video_resolution} | Video Quality | "720p" |
+
 
 Movies:
 | Variable | Description | Example |
 |----------|-------------|---------|
 | ${title} | Movie title | "Inception" |
 | ${year} | Release year | "2010" |
-| ${duration} | Runtime | "2h 28m" |
-| ${genre} | Primary genre | "Sci-Fi" |
-| ${rating} | Rating score | "8.8" |
+| ${duration} | Runtime | "1h 51m" |
+| ${content_rating} | Content Rating | "PG13, R" |
+| ${video_resolution} | Video Quality | "720p" |
 
 ## Prerequisites
 

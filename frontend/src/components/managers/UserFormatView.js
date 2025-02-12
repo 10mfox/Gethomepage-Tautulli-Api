@@ -5,7 +5,6 @@ const UserFormatView = ({ onError, onSuccess }) => {
   const [fields, setFields] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedFieldIndex, setSelectedFieldIndex] = useState(null);
-  const [cursorPosition, setCursorPosition] = useState(0);
 
   const variables = [
     { code: '${friendly_name}', description: 'Display name' },
@@ -15,7 +14,8 @@ const UserFormatView = ({ onError, onSuccess }) => {
     { code: '${progress_percent}', description: 'Current progress' },
     { code: '${progress_time}', description: 'Progress timestamp' },
     { code: '${is_watching}', description: 'Current status' },
-    { code: '${last_seen_formatted}', description: 'Last activity timestamp' }
+    { code: '${last_seen_formatted}', description: 'Last activity timestamp' },
+    { code: '${stream_container_decision}', description: 'Transcode or Direct Play' }
   ];
 
   useEffect(() => {

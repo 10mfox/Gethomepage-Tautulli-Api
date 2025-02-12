@@ -1,12 +1,21 @@
-// frontend/src/components/Dashboard.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, Film, Library } from 'lucide-react';
 import UserView from './dashboards/UserView';
 import RecentMediaView from './dashboards/RecentMediaView';
 import LibraryView from './dashboards/LibraryView';
 
+const DASHBOARD_TAB_STORAGE_KEY = 'tautulli-dashboard-active-tab';
+
 const Dashboard = () => {
-  const [activeTab, setActiveTab] = useState('users');
+  const [activeTab, setActiveTab] = useState(() => {
+    // Initialize from localStorage, default to 'users' if not found
+    return localStorage.getItem(DASHBOARD_TAB_STORAGE_KEY) || 'users';
+  });
+
+  // Save active tab to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem(DASHBOARD_TAB_STORAGE_KEY, activeTab);
+  }, [activeTab]);
 
   const tabs = [
     { id: 'users', label: 'Users', icon: Users, component: UserView },
