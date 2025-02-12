@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Film, Layout } from 'lucide-react';
+import { Users, Film, Layout, Globe } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import UserFormatView from './managers/UserFormatView';
 import MediaFormatView from './managers/MediaFormatView';
 import SectionManager from './managers/SectionManager';
+import EndpointsView from './managers/EndpointsView';
 
 const TAB_STORAGE_KEY = 'tautulli-settings-active-tab';
 
@@ -61,7 +62,8 @@ const FormatManager = () => {
   const tabs = [
     { id: 'user', label: 'User Display', icon: Users },
     { id: 'media', label: 'Media Display', icon: Film },
-    { id: 'sections', label: 'Section Manager', icon: Layout }
+    { id: 'sections', label: 'Section Manager', icon: Layout },
+    { id: 'endpoints', label: 'API Endpoints', icon: Globe }
   ];
 
   return (
@@ -82,7 +84,7 @@ const FormatManager = () => {
         {hasSections ? (
           <>
             <div className="border-b border-gray-700">
-              <div className="flex">
+              <div className="flex flex-wrap">
                 {tabs.map(({ id, label, icon: Icon }) => (
                   <button
                     key={id}
@@ -109,6 +111,9 @@ const FormatManager = () => {
               )}
               {activeView === 'sections' && (
                 <SectionManager onError={handleError} onSuccess={handleSuccess} />
+              )}
+              {activeView === 'endpoints' && (
+                <EndpointsView />
               )}
             </div>
           </>

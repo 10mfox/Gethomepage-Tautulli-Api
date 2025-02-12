@@ -49,8 +49,6 @@ function log(message) {
 }
 
 function logServerStart(port, config) {
-  const baseUrl = `http://localhost:${port}`;
-
   // Configuration loaded message
   log(`${colors.brightGreen}✓${colors.reset} ${colors.brightWhite}Loaded configuration${colors.reset}`);
   log('');
@@ -68,52 +66,6 @@ function logServerStart(port, config) {
   log(`${colors.brightGreen}▸${colors.reset} Tautulli URL: ${colors.brightYellow}${config?.baseUrl || 'Not set'}${colors.reset}`);
   log(`${colors.brightGreen}▸${colors.reset} Environment: ${colors.brightYellow}${process.env.NODE_ENV || 'development'}${colors.reset}`);
   log('');
-
-  // Available Endpoints
-  log(`${colors.brightMagenta}${colors.bright}AVAILABLE ENDPOINTS${colors.reset}`);
-
-  // User Endpoints
-  log(`${colors.brightGreen}▸${colors.reset} ${colors.brightCyan}${baseUrl}/api/users${colors.reset}`);
-  log(`  ${colors.dim}User activity and status information${colors.reset}`);
-  log(`${colors.brightGreen}▸${colors.reset} ${colors.brightCyan}${baseUrl}/api/users/format-settings${colors.reset}`);
-  log(`  ${colors.dim}Manage user display formats${colors.reset}`);
-  log('');
-
-  // Library Endpoints
-  log(`${colors.brightGreen}▸${colors.reset} ${colors.brightCyan}${baseUrl}/api/libraries${colors.reset}`);
-  log(`  ${colors.dim}Library sections and statistics${colors.reset}`);
-  log('');
-
-  // Movies Endpoints
-  const movieIds = config?.sections?.movies || [];
-  if (movieIds.length > 1) {
-    log(`${colors.brightGreen}▸${colors.reset} ${colors.brightCyan}${baseUrl}/api/recent/movies?count=5${colors.reset}`);
-    log(`  ${colors.dim}Get all recently added movies content (combines ${colors.brightYellow}${movieIds.length}${colors.dim} sections)${colors.reset}`);
-  }
-  movieIds.forEach(id => {
-    log(`${colors.brightGreen}▸${colors.reset} ${colors.brightCyan}${baseUrl}/api/recent/movies/${id}?count=5${colors.reset}`);
-    log(`  ${colors.dim}Get recently added movies content from section ${colors.brightYellow}${id}${colors.reset}`);
-  });
-  if (movieIds.length === 0) {
-    log(`${colors.brightGreen}▸${colors.reset} ${colors.brightCyan}${baseUrl}/api/recent/movies?count=5${colors.reset}`);
-    log(`  ${colors.dim}Movies sections not configured${colors.reset}`);
-  }
-  log('');
-
-  // TV Shows Endpoints
-  const showIds = config?.sections?.shows || [];
-  if (showIds.length > 1) {
-    log(`${colors.brightGreen}▸${colors.reset} ${colors.brightCyan}${baseUrl}/api/recent/shows?count=5${colors.reset}`);
-    log(`  ${colors.dim}Get all recently added shows content (combines ${colors.brightYellow}${showIds.length}${colors.dim} sections)${colors.reset}`);
-  }
-  showIds.forEach(id => {
-    log(`${colors.brightGreen}▸${colors.reset} ${colors.brightCyan}${baseUrl}/api/recent/shows/${id}?count=5${colors.reset}`);
-    log(`  ${colors.dim}Get recently added shows content from section ${colors.brightYellow}${id}${colors.reset}`);
-  });
-  if (showIds.length === 0) {
-    log(`${colors.brightGreen}▸${colors.reset} ${colors.brightCyan}${baseUrl}/api/recent/shows?count=5${colors.reset}`);
-    log(`  ${colors.dim}TV Show sections not configured${colors.reset}`);
-  }
 }
 
 function logError(context, error) {

@@ -1,4 +1,3 @@
-// src/api/libraries.js
 const express = require('express');
 const axios = require('axios');
 
@@ -18,8 +17,29 @@ router.get('/', async (req, res) => {
       }
     });
 
+    // Filter and transform the data
+    const filteredData = response.data.response.data.data.map(library => {
+      const baseLibrary = {
+        section_name: library.section_name,
+        section_type: library.section_type,
+        count: library.count,
+        section_id: library.section_id
+      };
+
+      // Only include parent_count and child_count for shows
+      if (library.section_type === 'show') {
+        return {
+          ...baseLibrary,
+          parent_count: library.parent_count,
+          child_count: library.child_count
+        };
+      }
+
+      return baseLibrary;
+    });
+
     // Sort the data by section_id
-    const sortedData = response.data.response.data.data.sort((a, b) => a.section_id - b.section_id);
+    const sortedData = filteredData.sort((a, b) => a.section_id - b.section_id);
 
     res.json({ 
       response: {
@@ -92,42 +112,28 @@ router.get('/:sectionId', async (req, res) => {
       }
     });
 
-    res.json({ 
-      response: {
-        result: 'success',
-        data: response.data.response.data
-      }
-    });
+    // Filter the response data
+    const libraryData = response.data.response.data;
+    const baseData = {
+      section_name: libraryData.section_name,
+      section_type: libraryData.section_type,
+      count: libraryData.count,
+      section_id: libraryData.section_id
+    };
 
-  } catch (error) {
-    res.status(500).json({ 
-      response: {
-        result: 'error',
-        message: error.message 
-      }
-    });
-  }
-});
-
-// Get library watch statistics
-router.get('/:sectionId/stats', async (req, res) => {
-  try {
-    if (!process.env.TAUTULLI_BASE_URL || !process.env.TAUTULLI_API_KEY) {
-      throw new Error('Tautulli configuration missing');
-    }
-
-    const response = await axios.get(`${process.env.TAUTULLI_BASE_URL}/api/v2`, {
-      params: {
-        apikey: process.env.TAUTULLI_API_KEY,
-        cmd: 'get_library_watch_time_stats',
-        section_id: req.params.sectionId
-      }
-    });
+    // Only include parent_count and child_count for shows
+    const filteredData = libraryData.section_type === 'show' 
+      ? {
+          ...baseData,
+          parent_count: libraryData.parent_count,
+          child_count: libraryData.child_count
+        }
+      : baseData;
 
     res.json({ 
       response: {
         result: 'success',
-        data: response.data.response.data
+        data: filteredData
       }
     });
 
