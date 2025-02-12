@@ -12,6 +12,14 @@
       {
         "id": "activity",
         "template": "${media_type} - ${friendly_name} - ${total_plays} plays"
+      },
+      {
+        "id": "playback",
+        "template": "${stream_container_decision}"
+      },
+      {
+        "id": "last_seen",
+        "template": "${last_seen_formatted}"
       }
     ]
   },

@@ -1,4 +1,3 @@
-// frontend/src/components/managers/SectionManager.js
 import React, { useState, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription } from '../ui/alert';
@@ -65,7 +64,6 @@ const SectionManager = ({ onError, onSuccess }) => {
 
   const handleSave = async () => {
     try {
-      // First get the current settings to preserve formats
       const currentSettings = await fetch('/api/media/settings');
       const { formats: existingFormats } = await currentSettings.json();
 
@@ -76,7 +74,7 @@ const SectionManager = ({ onError, onSuccess }) => {
         },
         body: JSON.stringify({ 
           sections,
-          formats: existingFormats || {} // Preserve existing formats
+          formats: existingFormats || {}
         }),
       });
 
@@ -85,6 +83,7 @@ const SectionManager = ({ onError, onSuccess }) => {
       }
 
       onSuccess();
+      window.dispatchEvent(new Event('settingsUpdated'));
       await fetchData();
     } catch (error) {
       console.error('Save error:', error);

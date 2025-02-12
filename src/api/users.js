@@ -86,7 +86,8 @@ router.get('/', async (req, res) => {
           duration: Math.floor((session.duration || 0) / 1000),
           last_seen: Math.floor(Date.now() / 1000),
           parent_media_index: session.parent_media_index,
-          media_index: session.media_index
+          media_index: session.media_index,
+          stream_container_decision: session.stream_container_decision || 'direct play'
         };
       }
     });
@@ -134,6 +135,7 @@ router.get('/', async (req, res) => {
         progress_percent: watching ? `${watching.progress_percent}%` : '',
         progress_time: watching ? `${formatTimeHHMM(watching.view_offset)} / ${formatTimeHHMM(watching.duration)}` : '',
         last_seen_formatted: watching ? '🟢' : (user.last_seen ? formatTimeDiff(user.last_seen) : 'Never'),
+        stream_container_decision: watching ? watching.stream_container_decision : '',
         _last_seen: lastSeen,
         _is_watching: !!watching
       };

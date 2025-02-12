@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Settings } from 'lucide-react';
 
@@ -23,9 +23,11 @@ const Nav = () => {
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
-            <span className="text-xl font-bold text-white">
-              Tautulli Manager
-            </span>
+            <Link to="/" className="flex items-center">
+              <span className="text-xl font-bold text-white">
+                Tautulli Manager
+              </span>
+            </Link>
           </div>
 
           <div className="flex space-x-4">
