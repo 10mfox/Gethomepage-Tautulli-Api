@@ -78,7 +78,7 @@ const UserView = () => {
           <select
             value={pageSize}
             onChange={handlePageSizeChange}
-            className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm"
+            className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm min-w-[140px]"
           >
             <option value="10">10 per page</option>
             <option value="25">25 per page</option>

@@ -7,6 +7,27 @@ const MediaFormatView = ({ onError, onSuccess }) => {
   ]);
   const [formats, setFormats] = useState({});
   const [loading, setLoading] = useState(true);
+  const [selectedSection, setSelectedSection] = useState(null);
+  const [cursorPosition, setCursorPosition] = useState(0);
+
+  const variables = {
+    shows: [
+      { code: '${grandparent_title}', description: 'Show name' },
+      { code: '${parent_media_index}', description: 'Season number' },
+      { code: '${media_index}', description: 'Episode number' },
+      { code: '${title}', description: 'Episode title' },
+      { code: '${duration}', description: 'Runtime' },
+      { code: '${content_rating}', description: 'Content rating' },
+      { code: '${video_resolution}', description: 'Video quality' }
+    ],
+    movies: [
+      { code: '${title}', description: 'Movie title' },
+      { code: '${year}', description: 'Release year' },
+      { code: '${duration}', description: 'Runtime' },
+      { code: '${content_rating}', description: 'Content rating' },
+      { code: '${video_resolution}', description: 'Video quality' }
+    ]
+  };
 
   useEffect(() => {
     fetchSettings();
@@ -17,7 +38,6 @@ const MediaFormatView = ({ onError, onSuccess }) => {
       const response = await fetch('/api/media/settings');
       const data = await response.json();
       
-      // Convert sections data to match our state structure
       const types = [
         { 
           type: 'shows', 
@@ -54,9 +74,37 @@ const MediaFormatView = ({ onError, onSuccess }) => {
     });
   };
 
+  const textareaRefs = React.useRef({});
+
+  const handleInputChange = (type, sectionId, e) => {
+    handleFormatChange(type, sectionId, 'title', e.target.value);
+  };
+
+  const insertVariable = (code) => {
+    if (!selectedSection) return;
+    const [type, sectionId] = selectedSection.split('-');
+    
+    const textarea = textareaRefs.current[`${type}-${sectionId}`];
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    
+    const currentFormat = formats[type]?.[sectionId]?.title || '';
+    const newFormat = currentFormat.slice(0, start) + code + currentFormat.slice(end);
+    
+    handleFormatChange(type, sectionId, 'title', newFormat);
+
+    // Set cursor position after the inserted variable
+    setTimeout(() => {
+      textarea.focus();
+      const newPosition = start + code.length;
+      textarea.setSelectionRange(newPosition, newPosition);
+    }, 0);
+  };
+
   const handleSave = async () => {
     try {
-      // Convert our state structure back to the API format
       const sections = sectionTypes.reduce((acc, { type, sections }) => {
         acc[type] = sections.map(s => parseInt(s.id)).filter(id => !isNaN(id));
         return acc;
@@ -109,72 +157,30 @@ const MediaFormatView = ({ onError, onSuccess }) => {
 
                 <div className="space-y-2">
                   <label className="block text-sm text-gray-300">Title Format</label>
-                  <input
+                  <textarea
                     value={formats[type]?.[section.id]?.title || ''}
-                    onChange={(e) => handleFormatChange(type, section.id, 'title', e.target.value)}
-                    className="w-full p-2 bg-gray-800 border border-gray-600 rounded"
+                    onChange={(e) => handleInputChange(type, section.id, e)}
+                    onFocus={() => setSelectedSection(`${type}-${section.id}`)}
+                    ref={(el) => textareaRefs.current[`${type}-${section.id}`] = el}
+                    className="w-full p-2 bg-gray-800 border border-gray-600 rounded min-h-[60px]"
                     placeholder={`Default format for ${type}`}
                   />
                 </div>
 
                 <div className="mt-4 p-3 bg-gray-800 rounded">
-                  <p className="text-sm font-medium text-gray-300 mb-2">Available Variables:</p>
+                  <p className="text-sm font-medium text-gray-300 mb-2">Available Variables (click to add):</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {type === 'shows' ? (
-                      <>
-                        <div className="text-sm">
-                          <code className="text-blue-300">${'{grandparent_title}'}</code>
-                          <span className="text-gray-400 ml-2">- Show name</span>
-                        </div>
-                        <div className="text-sm">
-                          <code className="text-blue-300">${'{parent_media_index}'}</code>
-                          <span className="text-gray-400 ml-2">- Season number</span>
-                        </div>
-                        <div className="text-sm">
-                          <code className="text-blue-300">${'{media_index}'}</code>
-                          <span className="text-gray-400 ml-2">- Episode number</span>
-                        </div>
-                        <div className="text-sm">
-                          <code className="text-blue-300">${'{title}'}</code>
-                          <span className="text-gray-400 ml-2">- Episode title</span>
-                        </div>
-                        <div className="text-sm">
-                          <code className="text-blue-300">${'{duration}'}</code>
-                          <span className="text-gray-400 ml-2">- Runtime</span>
-                        </div>
-                        <div className="text-sm">
-                          <code className="text-blue-300">${'{content_rating}'}</code>
-                          <span className="text-gray-400 ml-2">- Content rating</span>
-                        </div>
-                        <div className="text-sm">
-                          <code className="text-blue-300">${'{video_resolution}'}</code>
-                          <span className="text-gray-400 ml-2">- Video quality</span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="text-sm">
-                          <code className="text-blue-300">${'{title}'}</code>
-                          <span className="text-gray-400 ml-2">- Movie title</span>
-                        </div>
-                        <div className="text-sm">
-                          <code className="text-blue-300">${'{year}'}</code>
-                          <span className="text-gray-400 ml-2">- Release year</span>
-                        </div>
-                        <div className="text-sm">
-                          <code className="text-blue-300">${'{duration}'}</code>
-                          <span className="text-gray-400 ml-2">- Runtime</span>
-                        </div>
-                        <div className="text-sm">
-                          <code className="text-blue-300">${'{content_rating}'}</code>
-                          <span className="text-gray-400 ml-2">- Content rating</span>
-                        </div>
-                        <div className="text-sm">
-                          <code className="text-blue-300">${'{video_resolution}'}</code>
-                          <span className="text-gray-400 ml-2">- Video quality</span>
-                        </div>
-                      </>
-                    )}
+                    {variables[type].map(({ code, description }) => (
+                      <button
+                        key={code}
+                        onClick={() => insertVariable(code)}
+                        className="text-left text-sm p-1 hover:bg-gray-700 rounded transition-colors"
+                        disabled={selectedSection !== `${type}-${section.id}`}
+                      >
+                        <code className="text-blue-300">{code}</code>
+                        <span className="text-gray-400 ml-2">- {description}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>

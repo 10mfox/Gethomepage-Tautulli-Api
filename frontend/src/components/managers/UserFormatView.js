@@ -4,6 +4,19 @@ import { Plus, Trash2 } from 'lucide-react';
 const UserFormatView = ({ onError, onSuccess }) => {
   const [fields, setFields] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedFieldIndex, setSelectedFieldIndex] = useState(null);
+  const [cursorPosition, setCursorPosition] = useState(0);
+
+  const variables = [
+    { code: '${friendly_name}', description: 'Display name' },
+    { code: '${total_plays}', description: 'Total play count' },
+    { code: '${last_played}', description: 'Currently watching/last watched' },
+    { code: '${media_type}', description: 'Type of media' },
+    { code: '${progress_percent}', description: 'Current progress' },
+    { code: '${progress_time}', description: 'Progress timestamp' },
+    { code: '${is_watching}', description: 'Current status' },
+    { code: '${last_seen_formatted}', description: 'Last activity timestamp' }
+  ];
 
   useEffect(() => {
     fetchSettings();
@@ -29,12 +42,42 @@ const UserFormatView = ({ onError, onSuccess }) => {
 
   const removeField = (index) => {
     setFields(fields.filter((_, i) => i !== index));
+    setSelectedFieldIndex(null);
   };
 
   const updateField = (index, key, value) => {
     const newFields = [...fields];
     newFields[index] = { ...newFields[index], [key]: value };
     setFields(newFields);
+  };
+
+  const textareaRefs = React.useRef({});
+
+  const handleTemplateChange = (index, e) => {
+    updateField(index, 'template', e.target.value);
+  };
+
+  const insertVariable = (code) => {
+    if (selectedFieldIndex === null) return;
+    
+    const textarea = textareaRefs.current[selectedFieldIndex];
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    
+    const field = fields[selectedFieldIndex];
+    const template = field.template;
+    const newTemplate = template.slice(0, start) + code + template.slice(end);
+    
+    updateField(selectedFieldIndex, 'template', newTemplate);
+
+    // Set cursor position after the inserted variable
+    setTimeout(() => {
+      textarea.focus();
+      const newPosition = start + code.length;
+      textarea.setSelectionRange(newPosition, newPosition);
+    }, 0);
   };
 
   const handleSave = async () => {
@@ -100,49 +143,30 @@ const UserFormatView = ({ onError, onSuccess }) => {
 
               <div className="space-y-2">
                 <label className="block text-sm text-gray-300">Display Format</label>
-                <input
+                <textarea
                   value={field.template}
-                  onChange={(e) => updateField(index, 'template', e.target.value)}
-                  className="w-full p-2 bg-gray-800 border border-gray-600 rounded"
+                  onChange={(e) => handleTemplateChange(index, e)}
+                  onFocus={() => setSelectedFieldIndex(index)}
+                  ref={(el) => textareaRefs.current[index] = el}
+                  className="w-full p-2 bg-gray-800 border border-gray-600 rounded min-h-[60px]"
                   placeholder="Enter display format template"
                 />
               </div>
 
               <div className="mt-4 p-3 bg-gray-800 rounded">
-                <p className="text-sm font-medium text-gray-300 mb-2">Available Variables:</p>
+                <p className="text-sm font-medium text-gray-300 mb-2">Available Variables (click to add):</p>
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="text-sm">
-                    <code className="text-blue-300">${'{friendly_name}'}</code>
-                    <span className="text-gray-400 ml-2">- Display name</span>
-                  </div>
-                  <div className="text-sm">
-                    <code className="text-blue-300">${'{total_plays}'}</code>
-                    <span className="text-gray-400 ml-2">- Total play count</span>
-                  </div>
-                  <div className="text-sm">
-                    <code className="text-blue-300">${'{last_played}'}</code>
-                    <span className="text-gray-400 ml-2">- Currently watching/last watched</span>
-                  </div>
-                  <div className="text-sm">
-                    <code className="text-blue-300">${'{media_type}'}</code>
-                    <span className="text-gray-400 ml-2">- Type of media</span>
-                  </div>
-                  <div className="text-sm">
-                    <code className="text-blue-300">${'{progress_percent}'}</code>
-                    <span className="text-gray-400 ml-2">- Current progress</span>
-                  </div>
-                  <div className="text-sm">
-                    <code className="text-blue-300">${'{progress_time}'}</code>
-                    <span className="text-gray-400 ml-2">- Progress timestamp</span>
-                  </div>
-                  <div className="text-sm">
-                    <code className="text-blue-300">${'{is_watching}'}</code>
-                    <span className="text-gray-400 ml-2">- Current status</span>
-                  </div>
-                  <div className="text-sm">
-                    <code className="text-blue-300">${'{last_seen_formatted}'}</code>
-                    <span className="text-gray-400 ml-2">- Last activity timestamp</span>
-                  </div>
+                  {variables.map(({ code, description }) => (
+                    <button
+                      key={code}
+                      onClick={() => insertVariable(code)}
+                      className="text-left text-sm p-1 hover:bg-gray-700 rounded transition-colors"
+                      disabled={selectedFieldIndex !== index}
+                    >
+                      <code className="text-blue-300">{code}</code>
+                      <span className="text-gray-400 ml-2">- {description}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -152,7 +176,7 @@ const UserFormatView = ({ onError, onSuccess }) => {
 
       <button
         onClick={handleSave}
-        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
       >
         Save Changes
       </button>

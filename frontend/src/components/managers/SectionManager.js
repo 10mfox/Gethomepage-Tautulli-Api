@@ -1,48 +1,65 @@
+// frontend/src/components/managers/SectionManager.js
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
+import { Alert, AlertDescription } from '../ui/alert';
 
 const SectionManager = ({ onError, onSuccess }) => {
   const [sections, setSections] = useState({
     shows: [],
     movies: []
   });
+  const [availableSections, setAvailableSections] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    fetchSettings();
+    fetchData();
   }, []);
 
-  const fetchSettings = async () => {
+  const fetchData = async () => {
     try {
-      const response = await fetch('/api/media/settings');
-      const data = await response.json();
-      setSections(data.sections || { shows: [], movies: [] });
-      setLoading(false);
+      setLoading(true);
+      const [settingsResponse, sectionsResponse] = await Promise.all([
+        fetch('/api/media/settings'),
+        fetch('/api/libraries/sections')
+      ]);
+
+      if (!settingsResponse.ok || !sectionsResponse.ok) {
+        throw new Error('Failed to fetch data');
+      }
+
+      const settingsData = await settingsResponse.json();
+      const sectionsData = await sectionsResponse.json();
+
+      setSections(settingsData.sections || { shows: [], movies: [] });
+      setAvailableSections(sectionsData.response.data || []);
     } catch (error) {
-      console.error('Failed to load settings:', error);
+      console.error('Failed to load data:', error);
       onError('Failed to load section settings');
+    } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const addSection = (type) => {
+  const handleRefresh = async () => {
+    if (!refreshing) {
+      setRefreshing(true);
+      await fetchData();
+    }
+  };
+
+  const addSection = (type, sectionId) => {
     setSections(prev => ({
       ...prev,
-      [type]: [...prev[type], '']
+      [type]: [...new Set([...prev[type], sectionId])]
     }));
   };
 
-  const removeSection = (type, index) => {
+  const removeSection = (type, sectionId) => {
     setSections(prev => ({
       ...prev,
-      [type]: prev[type].filter((_, i) => i !== index)
-    }));
-  };
-
-  const updateSection = (type, index, value) => {
-    setSections(prev => ({
-      ...prev,
-      [type]: prev[type].map((id, i) => i === index ? value : id)
+      [type]: prev[type].filter(id => id !== sectionId)
     }));
   };
 
@@ -52,18 +69,13 @@ const SectionManager = ({ onError, onSuccess }) => {
       const currentSettings = await fetch('/api/media/settings');
       const { formats: existingFormats } = await currentSettings.json();
 
-      const cleanedSections = {
-        shows: sections.shows.map(id => parseInt(id)).filter(id => !isNaN(id) && id > 0),
-        movies: sections.movies.map(id => parseInt(id)).filter(id => !isNaN(id) && id > 0)
-      };
-
       const response = await fetch('/api/media/settings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          sections: cleanedSections,
+          sections,
           formats: existingFormats || {} // Preserve existing formats
         }),
       });
@@ -73,71 +85,97 @@ const SectionManager = ({ onError, onSuccess }) => {
       }
 
       onSuccess();
-      await fetchSettings();
+      await fetchData();
     } catch (error) {
       console.error('Save error:', error);
       onError('Failed to save section settings');
     }
   };
 
-  if (loading) {
-    return <div className="text-center text-gray-400">Loading sections...</div>;
-  }
+  const SectionColumn = ({ type }) => {
+    const availableForType = availableSections.filter(section => section.type === type);
+    const selectedIds = sections[type];
 
-  const SectionColumn = ({ type, sections }) => (
-    <div className="flex-1">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white capitalize">
-          {type}
-        </h3>
-        <button
-          onClick={() => addSection(type)}
-          className="flex items-center gap-2 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" />
-          Add Section
-        </button>
-      </div>
+    return (
+      <div className="flex-1">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-white capitalize">
+            {type}
+          </h3>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className={`flex items-center gap-2 px-2 py-1 rounded text-gray-300 hover:text-white ${
+              refreshing ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+            title="Refresh Sections"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
 
-      <div className="space-y-3">
-        {sections.length === 0 ? (
-          <div className="p-4 text-center text-gray-400 border border-gray-700 rounded-lg">
-            No sections configured
-          </div>
-        ) : (
-          sections.map((sectionId, index) => (
-            <div key={index} className="flex items-center gap-2">
-              <input
-                type="number"
-                value={sectionId}
-                onChange={(e) => updateSection(type, index, e.target.value)}
-                placeholder="Section ID"
-                className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded focus:ring-blue-500 focus:border-blue-500"
-              />
-              <button
-                onClick={() => removeSection(type, index)}
-                className="p-2 text-red-400 hover:text-red-300 rounded"
-                title="Remove Section"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+        <div className="space-y-3">
+          {availableForType.length === 0 ? (
+            <div className="p-4 text-center text-gray-400 border border-gray-700 rounded-lg">
+              No {type} libraries found in Tautulli
             </div>
-          ))
+          ) : (
+            availableForType.map(section => (
+              <div key={section.id} className="flex items-center gap-2">
+                <label className="flex-1 flex items-center gap-3 px-3 py-2 bg-gray-800 border border-gray-700 rounded hover:bg-gray-750 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(section.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        addSection(type, section.id);
+                      } else {
+                        removeSection(type, section.id);
+                      }
+                    }}
+                    className="rounded border-gray-600 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-gray-300 flex-1">{section.name}</span>
+                  <span className="text-sm text-gray-500">ID: {section.id}</span>
+                </label>
+              </div>
+            ))
+          )}
+        </div>
+
+        {availableForType.length > 0 && (
+          <div className="mt-3 text-sm text-gray-400">
+            {selectedIds.length} of {availableForType.length} libraries selected
+          </div>
         )}
       </div>
-    </div>
-  );
+    );
+  };
+
+  if (loading && !refreshing) {
+    return (
+      <div className="flex justify-center items-center p-8">
+        <div className="loading-spinner" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      <Alert className="bg-blue-900/50 border-blue-800 text-blue-100">
+        <AlertDescription>
+          Select which Tautulli libraries to include in your dashboard. Changes will take effect after saving.
+        </AlertDescription>
+      </Alert>
+
       <div className="grid grid-cols-2 gap-8">
-        <SectionColumn type="shows" sections={sections.shows} />
-        <SectionColumn type="movies" sections={sections.movies} />
+        <SectionColumn type="shows" />
+        <SectionColumn type="movies" />
       </div>
 
       <button
         onClick={handleSave}
-        className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900"
       >
         Save Changes
       </button>
