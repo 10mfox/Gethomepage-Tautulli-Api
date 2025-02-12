@@ -9,6 +9,7 @@ const TAB_STORAGE_KEY = 'tautulli-settings-active-tab';
 
 const FormatManager = () => {
   const [sections, setSections] = useState(null);
+<<<<<<< HEAD
   const [activeView, setActiveView] = useState(() => {
     // Initialize from localStorage, default to 'sections' if not found
     return localStorage.getItem(TAB_STORAGE_KEY) || 'sections';
@@ -25,12 +26,19 @@ const FormatManager = () => {
     localStorage.setItem(TAB_STORAGE_KEY, activeView);
   }, [activeView]);
 
+=======
+  const [activeView, setActiveView] = useState('sections');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+>>>>>>> c178069cae9ceee0042a92b5f34bd7e37b65f936
   const checkSections = async () => {
     try {
       const response = await fetch('/api/media/settings');
       const data = await response.json();
       const sectionsData = data.sections || {};
       setSections(sectionsData);
+<<<<<<< HEAD
       
       // If no sections are configured, force 'sections' view
       const hasSections = sectionsData.shows?.length > 0 || sectionsData.movies?.length > 0;
@@ -42,6 +50,18 @@ const FormatManager = () => {
       setError('Failed to check configuration status');
     }
   };
+=======
+      return sectionsData.shows?.length > 0 || sectionsData.movies?.length > 0;
+    } catch (err) {
+      console.error('Error checking sections:', err);
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    checkSections();
+  }, []);
+>>>>>>> c178069cae9ceee0042a92b5f34bd7e37b65f936
 
   const handleError = (message) => {
     setError(message);
