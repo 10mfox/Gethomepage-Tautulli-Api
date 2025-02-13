@@ -18,8 +18,38 @@ const defaultSettings = {
     movies: []
   },
   mediaFormats: {
-    shows: {},
-    movies: {}
+    shows: {
+      fields: [
+        {
+          id: 'title',
+          template: '${grandparent_title} - S${parent_media_index}E${media_index} - ${title}'
+        },
+        {
+          id: 'details',
+          template: '${content_rating} - ${video_resolution}'
+        },
+        {
+          id: 'added',
+          template: 'Added ${added_at_relative}'
+        }
+      ]
+    },
+    movies: {
+      fields: [
+        {
+          id: 'title',
+          template: '${title} (${year})'
+        },
+        {
+          id: 'details',
+          template: '${content_rating} - ${video_resolution}'
+        },
+        {
+          id: 'added',
+          template: 'Added ${added_at_relative}'
+        }
+      ]
+    }
   }
 };
 
@@ -43,20 +73,14 @@ async function getSettings() {
     const data = await fs.readFile(CONFIG_FILE, 'utf8');
     const settings = JSON.parse(data);
     
-    // Ensure time_format is preserved
-    const mediaFormats = settings.mediaFormats || {};
-    for (const type in mediaFormats) {
-      for (const sectionId in mediaFormats[type]) {
-        if (!mediaFormats[type][sectionId].time_format) {
-          mediaFormats[type][sectionId].time_format = 'relative';
-        }
-      }
-    }
-    
+    // Ensure defaults for new settings
     return {
       ...defaultSettings,
       ...settings,
-      mediaFormats
+      mediaFormats: {
+        ...defaultSettings.mediaFormats,
+        ...settings.mediaFormats
+      }
     };
   } catch (error) {
     console.error('Error reading settings:', error);
@@ -67,29 +91,12 @@ async function getSettings() {
 async function saveSettings(settings) {
   try {
     await fs.mkdir(CONFIG_DIR, { recursive: true });
-    
-    // Ensure time_format is preserved during save
-    const mediaFormats = settings.mediaFormats || {};
-    for (const type in mediaFormats) {
-      for (const sectionId in mediaFormats[type]) {
-        if (!mediaFormats[type][sectionId].time_format) {
-          mediaFormats[type][sectionId].time_format = 'relative';
-        }
-      }
-    }
-    
-    const settingsToSave = {
-      ...settings,
-      mediaFormats
-    };
-
     await fs.writeFile(
       CONFIG_FILE,
-      JSON.stringify(settingsToSave, null, 2),
+      JSON.stringify(settings, null, 2),
       'utf8'
     );
-
-    return settingsToSave;
+    return settings;
   } catch (error) {
     console.error('Error saving settings:', error);
     throw error;

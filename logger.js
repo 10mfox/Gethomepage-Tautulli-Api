@@ -1,3 +1,5 @@
+// logger.js
+
 const colors = {
   reset: '\x1b[0m',
   bright: '\x1b[1m',
@@ -41,30 +43,27 @@ function getColoredTimestamp() {
     hour12: false
   }).replace(',', '');
 
-  return `${colors.brightBlue}${timestamp}${colors.reset}`;
+  return `${colors.brightYellow}${timestamp}${colors.reset}`;
 }
 
 function log(message) {
   console.log(`${getColoredTimestamp()} ${message}`);
 }
 
+const banner = `
+${colors.brightYellow}${colors.bright}╔════════════════════════════════════════════╗${colors.reset}
+${colors.brightYellow}${colors.bright}║${colors.brightWhite}            TAUTULLI API MANAGER            ${colors.brightYellow}║${colors.reset}
+${colors.brightYellow}${colors.bright}║${colors.yellow}             Made by ${colors.brightWhite}🔥  Olaf 🔥${colors.yellow}              ${colors.brightYellow}║${colors.reset}
+${colors.brightYellow}${colors.bright}╚════════════════════════════════════════════╝${colors.reset}
+`;
+
 function logServerStart(port, config) {
   // Configuration loaded message
-  log(`${colors.brightGreen}✓${colors.reset} ${colors.brightWhite}Loaded configuration${colors.reset}`);
+  log(`${colors.brightYellow}✓${colors.reset} ${colors.brightWhite}Loaded configuration${colors.reset}`);
   log('');
   
   // Title Banner
-  log(`${colors.brightCyan}${colors.bright}╔════════════════════════════════════════════╗${colors.reset}`);
-  log(`${colors.brightCyan}${colors.bright}║${colors.brightMagenta}            TAUTULLI CUSTOM API             ${colors.brightCyan}║${colors.reset}`);
-  log(`${colors.brightCyan}${colors.bright}╚════════════════════════════════════════════╝${colors.reset}`);
-  log('');
-
-  // Server Information
-  log(`${colors.brightMagenta}${colors.bright}SERVER INFORMATION${colors.reset}`);
-  log(`${colors.brightGreen}▸${colors.reset} Status: ${colors.brightGreen}Running${colors.reset}`);
-  log(`${colors.brightGreen}▸${colors.reset} Port: ${colors.brightYellow}${port}${colors.reset}`);
-  log(`${colors.brightGreen}▸${colors.reset} Tautulli URL: ${colors.brightYellow}${config?.baseUrl || 'Not set'}${colors.reset}`);
-  log(`${colors.brightGreen}▸${colors.reset} Environment: ${colors.brightYellow}${process.env.NODE_ENV || 'development'}${colors.reset}`);
+  console.log(banner);
   log('');
 }
 
@@ -77,11 +76,11 @@ function logRequest(method, path, status, duration) {
   // Skip logging for static files, favicon, and API calls
   if (path.startsWith('/static/') || path.includes('favicon') || path.startsWith('/api/')) return;
   
-  const statusColor = status >= 500 ? colors.brightRed : status >= 400 ? colors.brightYellow : colors.brightGreen;
+  const statusColor = status >= 500 ? colors.brightRed : status >= 400 ? colors.brightYellow : colors.yellow;
   const methodColor = {
-    GET: colors.brightCyan,
+    GET: colors.yellow,
     POST: colors.brightYellow,
-    PUT: colors.brightBlue,
+    PUT: colors.yellow,
     DELETE: colors.brightRed
   }[method] || colors.brightWhite;
 

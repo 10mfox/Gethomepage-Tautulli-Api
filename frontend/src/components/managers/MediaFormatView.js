@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 
 const MediaFormatView = ({ onError, onSuccess }) => {
   const [sectionTypes, setSectionTypes] = useState([
@@ -7,8 +8,8 @@ const MediaFormatView = ({ onError, onSuccess }) => {
   ]);
   const [formats, setFormats] = useState({});
   const [loading, setLoading] = useState(true);
+  const [selectedFieldIndex, setSelectedFieldIndex] = useState(null);
   const [selectedSection, setSelectedSection] = useState(null);
-  const [cursorPosition, setCursorPosition] = useState(0);
 
   const variables = {
     shows: [
@@ -18,14 +19,18 @@ const MediaFormatView = ({ onError, onSuccess }) => {
       { code: '${title}', description: 'Episode title' },
       { code: '${duration}', description: 'Runtime' },
       { code: '${content_rating}', description: 'Content rating' },
-      { code: '${video_resolution}', description: 'Video quality' }
+      { code: '${video_resolution}', description: 'Video quality' },
+      { code: '${added_at_relative}', description: 'Relative time (e.g. "2d ago")' },
+      { code: '${added_at_short}', description: 'Short date (e.g. "Feb 10")' }
     ],
     movies: [
       { code: '${title}', description: 'Movie title' },
       { code: '${year}', description: 'Release year' },
       { code: '${duration}', description: 'Runtime' },
       { code: '${content_rating}', description: 'Content rating' },
-      { code: '${video_resolution}', description: 'Video quality' }
+      { code: '${video_resolution}', description: 'Video quality' },
+      { code: '${added_at_relative}', description: 'Relative time (e.g. "2d ago")' },
+      { code: '${added_at_short}', description: 'Short date (e.g. "Feb 10")' }
     ]
   };
 
@@ -49,8 +54,19 @@ const MediaFormatView = ({ onError, onSuccess }) => {
         }
       ];
 
+      // Ensure each section has a fields array
+      const cleanedFormats = {};
+      Object.entries(data.formats || {}).forEach(([type, sectionFormats]) => {
+        cleanedFormats[type] = {};
+        Object.entries(sectionFormats).forEach(([sectionId, format]) => {
+          cleanedFormats[type][sectionId] = {
+            fields: format.fields || []
+          };
+        });
+      });
+
       setSectionTypes(types);
-      setFormats(data.formats || {});
+      setFormats(cleanedFormats);
       setLoading(false);
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -59,43 +75,71 @@ const MediaFormatView = ({ onError, onSuccess }) => {
     }
   };
 
-  const handleFormatChange = (type, sectionId, field, value) => {
+  const addField = (type, sectionId) => {
     setFormats(prev => {
       const newFormats = { ...prev };
       if (!newFormats[type]) newFormats[type] = {};
-      if (!newFormats[type][sectionId]) newFormats[type][sectionId] = {};
+      if (!newFormats[type][sectionId]) {
+        newFormats[type][sectionId] = {
+          fields: []
+        };
+      }
+      if (!newFormats[type][sectionId].fields) {
+        newFormats[type][sectionId].fields = [];
+      }
       
-      newFormats[type][sectionId] = {
-        ...newFormats[type][sectionId],
-        [field]: value
+      newFormats[type][sectionId].fields.push({
+        id: '',
+        template: ''
+      });
+      
+      return newFormats;
+    });
+  };
+
+  const removeField = (type, sectionId, index) => {
+    setFormats(prev => {
+      const newFormats = { ...prev };
+      newFormats[type][sectionId].fields.splice(index, 1);
+      return newFormats;
+    });
+    setSelectedFieldIndex(null);
+  };
+
+  const updateField = (type, sectionId, index, key, value) => {
+    setFormats(prev => {
+      const newFormats = { ...prev };
+      if (!newFormats[type][sectionId].fields) newFormats[type][sectionId].fields = [];
+      newFormats[type][sectionId].fields[index] = {
+        ...newFormats[type][sectionId].fields[index],
+        [key]: value
       };
-      
       return newFormats;
     });
   };
 
   const textareaRefs = React.useRef({});
 
-  const handleInputChange = (type, sectionId, e) => {
-    handleFormatChange(type, sectionId, 'title', e.target.value);
+  const handleTemplateChange = (type, sectionId, index, e) => {
+    updateField(type, sectionId, index, 'template', e.target.value);
   };
 
   const insertVariable = (code) => {
-    if (!selectedSection) return;
+    if (!selectedSection || selectedFieldIndex === null) return;
     const [type, sectionId] = selectedSection.split('-');
     
-    const textarea = textareaRefs.current[`${type}-${sectionId}`];
+    const textarea = textareaRefs.current[`${type}-${sectionId}-${selectedFieldIndex}`];
     if (!textarea) return;
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     
-    const currentFormat = formats[type]?.[sectionId]?.title || '';
-    const newFormat = currentFormat.slice(0, start) + code + currentFormat.slice(end);
+    const field = formats[type]?.[sectionId]?.fields?.[selectedFieldIndex];
+    const template = field?.template || '';
+    const newTemplate = template.slice(0, start) + code + template.slice(end);
     
-    handleFormatChange(type, sectionId, 'title', newFormat);
+    updateField(type, sectionId, selectedFieldIndex, 'template', newTemplate);
 
-    // Set cursor position after the inserted variable
     setTimeout(() => {
       textarea.focus();
       const newPosition = start + code.length;
@@ -105,10 +149,22 @@ const MediaFormatView = ({ onError, onSuccess }) => {
 
   const handleSave = async () => {
     try {
+      // Get all configured sections
       const sections = sectionTypes.reduce((acc, { type, sections }) => {
         acc[type] = sections.map(s => parseInt(s.id)).filter(id => !isNaN(id));
         return acc;
       }, {});
+
+      // Ensure each section has a fields array
+      const cleanedFormats = {};
+      Object.entries(formats).forEach(([type, sectionFormats]) => {
+        cleanedFormats[type] = {};
+        Object.entries(sectionFormats).forEach(([sectionId, format]) => {
+          cleanedFormats[type][sectionId] = {
+            fields: format.fields || []
+          };
+        });
+      });
 
       const response = await fetch('/api/media/settings', {
         method: 'POST',
@@ -117,7 +173,7 @@ const MediaFormatView = ({ onError, onSuccess }) => {
         },
         body: JSON.stringify({ 
           sections,
-          formats
+          formats: cleanedFormats
         }),
       });
 
@@ -151,38 +207,77 @@ const MediaFormatView = ({ onError, onSuccess }) => {
           ) : (
             sections.map(section => (
               <div key={section.id} className="p-4 bg-gray-700 rounded-lg space-y-4">
-                <h4 className="font-medium text-white">
-                  Section {section.id}
-                </h4>
-
-                <div className="space-y-2">
-                  <label className="block text-sm text-gray-300">Title Format</label>
-                  <textarea
-                    value={formats[type]?.[section.id]?.title || ''}
-                    onChange={(e) => handleInputChange(type, section.id, e)}
-                    onFocus={() => setSelectedSection(`${type}-${section.id}`)}
-                    ref={(el) => textareaRefs.current[`${type}-${section.id}`] = el}
-                    className="w-full p-2 bg-gray-800 border border-gray-600 rounded min-h-[60px]"
-                    placeholder={`Default format for ${type}`}
-                  />
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-white">
+                    Section {section.id}
+                  </h4>
+                  <button
+                    onClick={() => addField(type, section.id)}
+                    className="flex items-center gap-2 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Field
+                  </button>
                 </div>
 
-                <div className="mt-4 p-3 bg-gray-800 rounded">
-                  <p className="text-sm font-medium text-gray-300 mb-2">Available Variables (click to add):</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {variables[type].map(({ code, description }) => (
-                      <button
-                        key={code}
-                        onClick={() => insertVariable(code)}
-                        className="text-left text-sm p-1 hover:bg-gray-700 rounded transition-colors"
-                        disabled={selectedSection !== `${type}-${section.id}`}
-                      >
-                        <code className="text-blue-300">{code}</code>
-                        <span className="text-gray-400 ml-2">- {description}</span>
-                      </button>
-                    ))}
+                {!formats[type]?.[section.id]?.fields?.length ? (
+                  <div className="p-4 text-center text-gray-400 border border-gray-700 rounded-lg">
+                    No display fields configured. Click "Add Field" to begin.
                   </div>
-                </div>
+                ) : (
+                  formats[type][section.id].fields.map((field, index) => (
+                    <div key={index} className="space-y-4">
+                      <div className="flex items-center gap-4">
+                        <input
+                          type="text"
+                          value={field.id}
+                          onChange={(e) => updateField(type, section.id, index, 'id', e.target.value)}
+                          className="flex-1 p-2 bg-gray-800 border border-gray-600 rounded"
+                          placeholder="Field Name"
+                        />
+                        <button
+                          onClick={() => removeField(type, section.id, index)}
+                          className="p-2 text-red-400 hover:text-red-300"
+                          title="Remove Field"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-sm text-gray-300">Display Format</label>
+                        <textarea
+                          value={field.template}
+                          onChange={(e) => handleTemplateChange(type, section.id, index, e)}
+                          onFocus={() => {
+                            setSelectedSection(`${type}-${section.id}`);
+                            setSelectedFieldIndex(index);
+                          }}
+                          ref={(el) => textareaRefs.current[`${type}-${section.id}-${index}`] = el}
+                          className="w-full p-2 bg-gray-800 border border-gray-600 rounded min-h-[60px]"
+                          placeholder="Enter display format template"
+                        />
+                      </div>
+
+                      <div className="mt-4 p-3 bg-gray-800 rounded">
+                        <p className="text-sm font-medium text-gray-300 mb-2">Available Variables (click to add):</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {variables[type].map(({ code, description }) => (
+                            <button
+                              key={code}
+                              onClick={() => insertVariable(code)}
+                              className="text-left text-sm p-1 hover:bg-gray-700 rounded transition-colors"
+                              disabled={selectedSection !== `${type}-${section.id}` || selectedFieldIndex !== index}
+                            >
+                              <code className="text-blue-300">{code}</code>
+                              <span className="text-gray-400 ml-2">- {description}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             ))
           )}

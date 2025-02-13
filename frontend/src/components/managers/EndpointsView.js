@@ -48,42 +48,48 @@ const EndpointsView = () => {
       <div className="px-4 py-3 bg-gray-800 border-b border-gray-600">
         <h3 className="text-sm font-medium text-white">{title}</h3>
       </div>
-      <div className="p-4 space-y-3">
-        {endpoints.map((endpoint, index) => (
-          <div key={index} className="space-y-1">
-            <div className="space-y-2">
-              <div className="group relative flex items-center gap-2 bg-gray-800 rounded-lg p-2">
-                <ChevronRight className="h-4 w-4 text-blue-400 flex-shrink-0" />
-                <code className="text-sm text-blue-300 flex-grow break-all">
-                  {endpoint.url}
-                </code>
-                <button
-                  onClick={() => handleCopy(endpoint.url)}
-                  className="p-1.5 text-gray-400 hover:text-white rounded transition-colors"
-                  title="Copy URL"
-                >
-                  {copiedUrl === endpoint.url ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-400" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </button>
+      <div className="p-4">
+        {endpoints.length > 0 ? (
+          <div className="space-y-3">
+            {endpoints.map((endpoint, index) => (
+              <div key={index} className="space-y-1">
+                <div className="space-y-2">
+                  <div className="group relative flex items-center gap-2 bg-gray-800 rounded-lg p-2">
+                    <ChevronRight className="h-4 w-4 text-blue-400 flex-shrink-0" />
+                    <code className="text-sm text-blue-300 flex-grow break-all">
+                      {endpoint.url}
+                    </code>
+                    <button
+                      onClick={() => handleCopy(endpoint.url)}
+                      className="p-1.5 text-gray-400 hover:text-white rounded transition-colors"
+                      title="Copy URL"
+                    >
+                      {copiedUrl === endpoint.url ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-400" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => handleTest(endpoint.url)}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Test Endpoint
+                  </button>
+                </div>
+                {endpoint.description && (
+                  <p className="text-sm text-gray-400 ml-6">
+                    {endpoint.description}
+                  </p>
+                )}
               </div>
-              <button
-                onClick={() => handleTest(endpoint.url)}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-              >
-                <ExternalLink className="h-4 w-4" />
-                Test Endpoint
-              </button>
-            </div>
-            {endpoint.description && (
-              <p className="text-sm text-gray-400 ml-6">
-                {endpoint.description}
-              </p>
-            )}
+            ))}
           </div>
-        ))}
+        ) : (
+          <p className="text-sm text-gray-400">No sections configured for this type</p>
+        )}
       </div>
     </div>
   );
@@ -125,7 +131,7 @@ const EndpointsView = () => {
     },
     {
       title: 'Movie Endpoints',
-      endpoints: [
+      endpoints: movieIds.length > 0 ? [
         ...(movieIds.length > 1 ? [{
           url: `${baseUrl}/api/recent/movies?count=5`,
           description: `Get all recently added movies content (combines ${movieIds.length} sections)`
@@ -133,16 +139,12 @@ const EndpointsView = () => {
         ...movieIds.map(id => ({
           url: `${baseUrl}/api/recent/movies/${id}?count=5`,
           description: `Get recently added movies content from section ${id}`
-        })),
-        ...(movieIds.length === 0 ? [{
-          url: `${baseUrl}/api/recent/movies?count=5`,
-          description: 'Movies sections not configured'
-        }] : [])
-      ]
+        }))
+      ] : []
     },
     {
       title: 'TV Show Endpoints',
-      endpoints: [
+      endpoints: showIds.length > 0 ? [
         ...(showIds.length > 1 ? [{
           url: `${baseUrl}/api/recent/shows?count=5`,
           description: `Get all recently added shows content (combines ${showIds.length} sections)`
@@ -150,12 +152,8 @@ const EndpointsView = () => {
         ...showIds.map(id => ({
           url: `${baseUrl}/api/recent/shows/${id}?count=5`,
           description: `Get recently added shows content from section ${id}`
-        })),
-        ...(showIds.length === 0 ? [{
-          url: `${baseUrl}/api/recent/shows?count=5`,
-          description: 'TV Show sections not configured'
-        }] : [])
-      ]
+        }))
+      ] : []
     }
   ];
 

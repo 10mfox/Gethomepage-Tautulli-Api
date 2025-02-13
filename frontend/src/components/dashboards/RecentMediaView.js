@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
 
-const DATE_FORMAT_KEY = 'tautulli-date-format-preference';
 const RESULTS_PER_SECTION = 15;
 
 const RecentMediaView = () => {
@@ -14,13 +13,6 @@ const RecentMediaView = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [dateFormat, setDateFormat] = useState(() => {
-    return localStorage.getItem(DATE_FORMAT_KEY) || 'relative';
-  });
-
-  useEffect(() => {
-    localStorage.setItem(DATE_FORMAT_KEY, dateFormat);
-  }, [dateFormat]);
 
   const fetchLibraryNames = async () => {
     try {
@@ -117,24 +109,24 @@ const RecentMediaView = () => {
               </div>
               <div className="divide-y divide-gray-700">
                 {section.items.map((item, index) => (
-                  <div key={`${item.media_type}-${section.sectionId}-${index}`} 
+                  <div key={`${type}-${section.sectionId}-${index}`} 
                        className="p-4 hover:bg-gray-700/50 transition-colors">
-                    <div className="text-gray-200">{item.title}</div>
-                    <div className="flex items-center gap-2 mt-1">
-                      {item.content_rating && (
-                        <span className="px-1.5 py-0.5 text-xs bg-gray-700 text-gray-300 rounded">
-                          {item.content_rating}
-                        </span>
-                      )}
-                      {item.video_resolution && (
-                        <span className="px-1.5 py-0.5 text-xs bg-blue-900 text-blue-100 rounded">
-                          {item.video_resolution}
-                        </span>
-                      )}
-                      <span className="text-xs text-gray-400">
-                        {dateFormat === 'relative' ? item.added_at_relative : item.added_at_short}
-                      </span>
-                    </div>
+                    {/* Primary field */}
+                    {item.title && (
+                      <div className="text-gray-200">{item.title}</div>
+                    )}
+                    {/* Secondary fields */}
+                    {item.details && (
+                      <div className="text-gray-400 text-sm mt-1">
+                        {item.details}
+                      </div>
+                    )}
+                    {/* Additional fields */}
+                    {item.added && (
+                      <div className="text-gray-500 text-sm mt-1">
+                        {item.added}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -149,26 +141,17 @@ const RecentMediaView = () => {
     <div className="p-4 space-y-4">
       <div className="flex justify-between items-center">
         <div className="flex gap-4">
-          <select
-            value={dateFormat}
-            onChange={(e) => setDateFormat(e.target.value)}
-            className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 min-w-[140px]"
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className={`flex items-center gap-2 px-3 py-2 rounded text-white transition-colors ${
+              isRefreshing ? 'bg-gray-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
           >
-            <option value="relative">Relative Time</option>
-            <option value="short">Short Date</option>
-          </select>
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
         </div>
-
-        <button
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className={`flex items-center gap-2 px-3 py-2 rounded text-white transition-colors ${
-            isRefreshing ? 'bg-gray-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-          }`}
-        >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
       </div>
 
       {loading && !isRefreshing ? (
