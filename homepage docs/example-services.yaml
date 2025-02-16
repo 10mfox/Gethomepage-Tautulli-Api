@@ -11,12 +11,12 @@
             - field:
                 response:
                   data:
-                    0: title
+                    0: field
               additionalField:
                 field:
                   response:
                     data:
-                      0: added_at_short
+                      0: additionalfield
                 color: theme
      - Shows:
          icon: mdi-television-classic
@@ -30,12 +30,12 @@
               - field:
                   response:
                     data:
-                      0: title
+                      0: field
                 additionalField:
                   field:
                     response:
                       data:
-                        0: added_at_short
+                        0: additionalfield
                   color: theme
 - Media Count:
     - Media Count:
@@ -86,9 +86,9 @@
                - field:
                    response:
                      data:
-                       0: name
+                       0: field
                  additionalField:
                    field:
                      response:
                        data:
-                         0: watched
+                         0: additionalfield

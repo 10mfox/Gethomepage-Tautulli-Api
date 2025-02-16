@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Nav from './components/Nav';
+import Footer from './components/Footer';
 import Dashboard from './components/Dashboard';
 import FormatManager from './components/FormatManager';
 
@@ -9,7 +10,6 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Add event listener for settings updates
     const checkSections = async () => {
       try {
         const response = await fetch('/api/media/settings');
@@ -22,13 +22,10 @@ function App() {
       }
     };
 
-    // Listen for settings updates
     window.addEventListener('settingsUpdated', checkSections);
     
-    // Initial check
     checkSections();
 
-    // Cleanup
     return () => {
       window.removeEventListener('settingsUpdated', checkSections);
     };
@@ -47,9 +44,9 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-900">
+      <div className="min-h-screen bg-gray-900 flex flex-col">
         <Nav />
-        <div className="container mx-auto">
+        <main className="flex-grow container mx-auto pb-16">
           <Routes>
             <Route 
               path="/" 
@@ -61,7 +58,8 @@ function App() {
             />
             <Route path="/format" element={<FormatManager />} />
           </Routes>
-        </div>
+        </main>
+        <Footer />
       </div>
     </Router>
   );

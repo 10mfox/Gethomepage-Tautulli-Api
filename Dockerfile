@@ -3,7 +3,7 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy dependency files first for better caching
 COPY package*.json ./
 COPY frontend/package*.json ./frontend/
 
@@ -20,8 +20,8 @@ RUN cd frontend && npm run build
 # Production stage
 FROM node:18-alpine
 
-# Install tini
-RUN apk add --no-cache tini
+# Install tini and curl for health checks
+RUN apk add --no-cache tini curl
 
 WORKDIR /app
 
@@ -40,6 +40,10 @@ COPY --from=builder --chown=node:node /app/logger.js ./
 
 # Create config volume
 VOLUME /app/config
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:${TAUTULLI_CUSTOM_PORT:-3010}/api/health || exit 1
 
 # Switch to non-root user
 USER node

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Film, Layout, Globe } from 'lucide-react';
+import { Users, Film, Layout, Globe, Home } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import UserFormatView from './managers/UserFormatView';
 import MediaFormatView from './managers/MediaFormatView';
 import SectionManager from './managers/SectionManager';
 import EndpointsView from './managers/EndpointsView';
+import HomepageView from './managers/HomepageView';
 
 const TAB_STORAGE_KEY = 'tautulli-settings-active-tab';
 
@@ -63,6 +64,7 @@ const FormatManager = () => {
     { id: 'user', label: 'User Display', icon: Users },
     { id: 'media', label: 'Media Display', icon: Film },
     { id: 'sections', label: 'Section Manager', icon: Layout },
+    { id: 'homepage', label: 'Homepage Config', icon: Home },
     { id: 'endpoints', label: 'API Endpoints', icon: Globe }
   ];
 
@@ -111,6 +113,9 @@ const FormatManager = () => {
               )}
               {activeView === 'sections' && (
                 <SectionManager onError={handleError} onSuccess={handleSuccess} />
+              )}
+              {activeView === 'homepage' && (
+                <HomepageView />
               )}
               {activeView === 'endpoints' && (
                 <EndpointsView />

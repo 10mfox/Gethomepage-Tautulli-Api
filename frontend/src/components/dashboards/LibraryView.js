@@ -1,70 +1,39 @@
-// frontend/src/components/dashboards/LibraryView.js
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription } from '../ui/alert';
+import { useBackgroundRefresh } from '../../hooks/useBackgroundRefresh';
 
 const LibraryView = () => {
-  const [libraries, setLibraries] = useState([]);
-  const [selectedSections, setSelectedSections] = useState({ shows: [], movies: [] });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const fetchData = async () => {
+  const fetchLibraries = async () => {
     try {
-      if (refreshing) return;
-      setRefreshing(true);
-
-      // Fetch both libraries and settings in parallel
-      const [librariesResponse, settingsResponse] = await Promise.all([
-        fetch('/api/libraries'),
-        fetch('/api/media/settings')
-      ]);
-
-      if (!librariesResponse.ok || !settingsResponse.ok) {
+      const response = await fetch('/api/libraries');
+      if (!response.ok) {
         throw new Error('Failed to fetch library data');
       }
-
-      const librariesData = await librariesResponse.json();
-      const settingsData = await settingsResponse.json();
-
-      // Get all selected section IDs
-      const selectedIds = [
-        ...(settingsData.sections?.shows || []),
-        ...(settingsData.sections?.movies || [])
-      ];
-
-      // Filter and sort libraries to only show selected sections
-      const filteredLibraries = librariesData.response.data
-        .filter(library => selectedIds.includes(library.section_id))
-        .sort((a, b) => a.section_id - b.section_id);
-
-      setLibraries(filteredLibraries);
-      setSelectedSections(settingsData.sections || { shows: [], movies: [] });
-      setError(null);
+      return await response.json();
     } catch (error) {
-      console.error('Error fetching libraries:', error);
-      setError('Failed to load library data');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+      throw new Error('Failed to fetch libraries');
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const { 
+    data: libraries, 
+    loading, 
+    error, 
+    lastUpdated, 
+    refresh 
+  } = useBackgroundRefresh(fetchLibraries);
 
   const formatCount = (library) => {
     if (library.section_type === 'movie') {
-      return `${library.count.toLocaleString()} movies`;
+      return library.count_formatted + ' movies';
     } else if (library.section_type === 'show') {
-      return `${library.count.toLocaleString()} shows, ${library.parent_count.toLocaleString()} seasons, ${library.child_count.toLocaleString()} episodes`;
+      return `${library.count_formatted} shows, ${library.parent_count_formatted} seasons, ${library.child_count_formatted} episodes`;
     }
-    return library.count.toLocaleString();
+    return library.count_formatted;
   };
 
-  if (loading && !refreshing) {
+  if (loading && !libraries) {
     return (
       <div className="flex justify-center items-center p-8">
         <div className="loading-spinner" />
@@ -72,72 +41,103 @@ const LibraryView = () => {
     );
   }
 
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  const sections = libraries?.response?.sections || [];
+  const totals = libraries?.response?.totals;
+  const numConfigured = sections.filter(section => section.configured).length;
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div className="text-sm text-gray-400">
-          {libraries.length === 0 ? (
+          {numConfigured === 0 ? (
             'No libraries configured'
           ) : (
-            `Showing ${libraries.length} selected ${libraries.length === 1 ? 'library' : 'libraries'}`
+            `${numConfigured} configured ${numConfigured === 1 ? 'library' : 'libraries'}`
           )}
         </div>
         <button
-          onClick={fetchData}
-          disabled={refreshing}
-          className={`flex items-center gap-2 px-3 py-2 rounded text-white transition-colors ${
-            refreshing ? 'bg-gray-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-          }`}
+          onClick={refresh}
+          className="flex items-center gap-2 px-3 py-2 rounded text-white bg-blue-600 hover:bg-blue-700 relative group"
         >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          <RefreshCw className="h-4 w-4" />
           Refresh
+          {lastUpdated && (
+            <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs bg-gray-900 text-gray-300 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
         </button>
       </div>
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {libraries.length === 0 ? (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
-          <p className="text-gray-400">
-            No libraries are currently selected. Visit Format Settings to configure your library sections.
-          </p>
-        </div>
-      ) : (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-700">
-                  <th className="p-4 text-left text-gray-300">Section</th>
-                  <th className="p-4 text-left text-gray-300">Count</th>
-                  <th className="p-4 text-left text-gray-300">Type</th>
+      <div className="bg-gray-800 border border-gray-700 rounded-lg">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-700">
+                <th className="p-4 text-left text-gray-300">Section</th>
+                <th className="p-4 text-left text-gray-300">Count</th>
+                <th className="p-4 text-left text-gray-300">Type</th>
+                <th className="p-4 text-left text-gray-300">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sections.map((library) => (
+                <tr 
+                  key={library.section_id} 
+                  className="border-b border-gray-700 hover:bg-gray-700 transition-colors"
+                >
+                  <td className="p-4 text-gray-300">
+                    <div className="font-medium">{library.section_name}</div>
+                    <div className="text-sm text-gray-500">Section {library.section_id}</div>
+                  </td>
+                  <td className="p-4 text-gray-300">{formatCount(library)}</td>
+                  <td className="p-4 text-gray-300">
+                    {library.section_type === 'show' ? 'TV Show' : 'Movie'}
+                  </td>
+                  <td className="p-4">
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      library.configured
+                        ? 'bg-green-900 text-green-100'
+                        : 'bg-gray-700 text-gray-300'
+                    }`}>
+                      {library.configured ? 'Configured' : 'Disabled'}
+                    </span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {libraries.map((library) => (
-                  <tr 
-                    key={library.section_id} 
-                    className="border-b border-gray-700 hover:bg-gray-700 transition-colors"
-                  >
-                    <td className="p-4 text-gray-300">
-                      <div className="font-medium">{library.section_name}</div>
-                      <div className="text-sm text-gray-500">Section {library.section_id}</div>
+              ))}
+              {/* Totals Row - Movies */}
+              {totals && (
+                <>
+                  <tr className="bg-gray-750">
+                    <td className="p-4 text-gray-300 font-medium" colSpan="2">
+                      Movies Total
                     </td>
-                    <td className="p-4 text-gray-300">{formatCount(library)}</td>
-                    <td className="p-4 text-gray-300">
-                      {library.section_type === 'show' ? 'TV Show' : 'Movie'}
+                    <td className="p-4 text-gray-300" colSpan="2">
+                      {totals.movies.sections} {totals.movies.sections === 1 ? 'section' : 'sections'}, {totals.movies.total_items_formatted} movies
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  <tr className="bg-gray-750">
+                    <td className="p-4 text-gray-300 font-medium" colSpan="2">
+                      Shows Total
+                    </td>
+                    <td className="p-4 text-gray-300" colSpan="2">
+                      {totals.shows.sections} {totals.shows.sections === 1 ? 'section' : 'sections'}, {totals.shows.total_items_formatted} shows, {totals.shows.total_seasons_formatted} seasons, {totals.shows.total_episodes_formatted} episodes
+                    </td>
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
     </div>
   );
 };

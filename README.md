@@ -7,7 +7,6 @@ A web application that combines user activity monitoring, media format managemen
 ## Features
 
 ### User Activity Management
-
 - Real-time status updates for currently watching users
 - Customizable user status messages and display formats
 - Progress tracking with timestamps and percentages
@@ -17,7 +16,6 @@ A web application that combines user activity monitoring, media format managemen
 - Online/offline status indicators
 
 ### Media Management
-
 - Section-based organization for movies and TV shows
 - Customizable display formats for each media type
 - Recently added content tracking per section
@@ -26,7 +24,6 @@ A web application that combines user activity monitoring, media format managemen
 - Individual section statistics
 
 ### Library Statistics
-
 - Complete library section overview
 - Movie count per library section
 - TV show, season, and episode counts
@@ -34,49 +31,11 @@ A web application that combines user activity monitoring, media format managemen
 - Sorted by section ID for easy reference
 
 ### General Features
-
 - Dark mode responsive UI optimized for all devices
 - Persistent configuration storage
 - Real-time updates and live status indicators
 - Docker deployment with volume support
 - Comprehensive API endpoints
-
-### Display Format Variables
-
-User Format Variables:
-| Variable | Description | Example |
-|----------|-------------|---------|
-| ${friendly_name} | User's display name | "John Doe" |
-| ${total_plays} | Total play count | "150" |
-| ${last_played} | Currently watching/last watched | "The Matrix" |
-| ${media_type} | Type of media | "Movie" |
-| ${progress_percent} | Current progress | "45%" |
-| ${progress_time} | Progress timestamp | "1:15:30 / 2:30:00" |
-| ${is_watching} | Current status | "Watching/Idle" |
-| ${last_seen_formatted} | Last activity timestamp | "2 hours ago" |
-| ${stream_container_decision} | Container Steam Type | "Transcode or Direct Play" |
-
-Media Format Variables:
-Shows:
-| Variable | Description | Example |
-|----------|-------------|---------|
-| ${grandparent_title} | Show name | "Breaking Bad" |
-| ${parent_media_index} | Season number | "01" |
-| ${media_index} | Episode number | "05" |
-| ${title} | Episode title | "Gray Matter" |
-| ${duration} | Runtime | "1h 51m" |
-| ${content_rating} | Content Rating | "PG13, R" |
-| ${video_resolution} | Video Quality | "720p" |
-
-
-Movies:
-| Variable | Description | Example |
-|----------|-------------|---------|
-| ${title} | Movie title | "Inception" |
-| ${year} | Release year | "2010" |
-| ${duration} | Runtime | "1h 51m" |
-| ${content_rating} | Content Rating | "PG13, R" |
-| ${video_resolution} | Video Quality | "720p" |
 
 ## Prerequisites
 
@@ -85,9 +44,17 @@ Movies:
 - Docker and Docker Compose (for containerized deployment)
 - Node.js v18+ (for development)
 
+## Environment Variables
+
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| TAUTULLI_BASE_URL | Base URL of your Tautulli instance | Yes | - |
+| TAUTULLI_API_KEY | API key from Tautulli | Yes | - |
+| TAUTULLI_CUSTOM_PORT | Port for the web interface | No | 3010 |
+
 ## Quick Start
 
-1. Create a docker-compose.yml:
+1. Create a `docker-compose.yml`:
 
 ```yaml
 version: "3"
@@ -106,8 +73,7 @@ services:
     restart: unless-stopped
 ```
 
-2. Build and start:
-
+2. Start the container:
 ```bash
 docker compose up -d
 ```
@@ -117,91 +83,76 @@ docker compose up -d
 ## API Endpoints
 
 ### User Management
-
 ```
-GET /api/users
+GET /api/users                  # Get all users with activity
+GET /api/users/format-settings  # Get user format settings
+POST /api/users/format-settings # Update user format settings
 ```
 
 ### Media Management
-
 ```
-GET /api/recent/movies
-GET /api/recent/shows
-GET /api/recent/movies/:sectionId
-GET /api/recent/shows/:sectionId
+GET /api/recent/movies          # Get all recent movies
+GET /api/recent/shows           # Get all recent shows
+GET /api/recent/movies/:id      # Get recent movies for section
+GET /api/recent/shows/:id       # Get recent shows for section
+GET /api/media/settings         # Get media format settings
+POST /api/media/settings        # Update media format settings
 ```
 
 ### Library Management
-
 ```
-GET /api/libraries
-```
-
-### Dashboard
-
-```
-GET /api/config
-GET /api/health
+GET /api/libraries             # Get all library sections
+GET /api/libraries/sections    # Get configured sections
+GET /api/libraries/:id        # Get specific library details
 ```
 
----
-
-## Example [Homepage](https://gethomepage.dev/) Integration
-
-### PLEASE DO NOT COPY AND PASTE - THIS MAY NOT WORK FOR YOU - THIS IS JUST A EXAMPLE GUIDE
-
-Here's an example `services.yaml` along with `custom.css` configuration
-for integrating with [Homepage](https://gethomepage.dev/):
-
-### Recently Added Card
-
-<img src="screenshots/Recently.png" alt="Recently Added">
-
-`services.yaml`
-
-```yaml
-- Recently Added:
-    - Movies:
-        icon: mdi-filmstrip
-        id: list
-        widget:
-          type: customapi
-          url: http://your-tautulli-host:3010/api/recent/movies/2
-          method: GET
-          display: list
-          mappings:
-            - field:
-                response:
-                  data:
-                    0: title
-              additionalField:
-                field:
-                  response:
-                    data:
-                      0: added_at_short
-                color: theme
-    - Shows:
-        icon: mdi-television-classic
-        id: list
-        widget:
-          type: customapi
-          url: http://your-tautulli-host:3010/api/recent/shows/3
-          method: GET
-          display: list
-          mappings:
-            - field:
-                response:
-                  data:
-                    0: title
-              additionalField:
-                field:
-                  response:
-                    data:
-                      0: added_at_short
-                color: theme
+### System
+```
+GET /api/health               # Health check endpoint
+GET /api/config              # Get system configuration
+POST /api/cache/clear        # Clear system cache
 ```
 
-`custom.css`
+## Display Format Variables
+
+### User Format Variables
+| Variable | Description | Example |
+|----------|-------------|---------|
+| ${friendly_name} | User's display name | "John Doe" |
+| ${total_plays} | Total play count | "150" |
+| ${last_played} | Currently watching/last watched | "The Matrix" |
+| ${media_type} | Type of media | "Movie" |
+| ${progress_percent} | Current progress | "45%" |
+| ${progress_time} | Progress timestamp | "1:15:30 / 2:30:00" |
+| ${is_watching} | Current status | "Watching/Idle" |
+| ${last_seen_formatted} | Last activity timestamp | "2 hours ago" |
+| ${stream_container_decision} | Container Steam Type | "Transcode/Direct Play" |
+
+### Media Format Variables
+
+#### Shows
+| Variable | Description | Example |
+|----------|-------------|---------|
+| ${grandparent_title} | Show name | "Breaking Bad" |
+| ${parent_media_index} | Season number | "01" |
+| ${media_index} | Episode number | "05" |
+| ${title} | Episode title | "Gray Matter" |
+| ${duration} | Runtime | "1h 51m" |
+| ${content_rating} | Content Rating | "TV-MA" |
+| ${video_resolution} | Video Quality | "720p" |
+| ${added_at_relative} | Relative time | "2d ago" |
+| ${added_at_short} | Short date | "Feb 10" |
+
+#### Movies
+| Variable | Description | Example |
+|----------|-------------|---------|
+| ${title} | Movie title | "Inception" |
+| ${year} | Release year | "2010" |
+| ${duration} | Runtime | "1h 51m" |
+| ${content_rating} | Content Rating | "PG-13" |
+| ${video_resolution} | Video Quality | "720p" |
+| ${added_at_relative} | Relative time | "2d ago" |
+| ${added_at_short} | Short date | "Feb 10" |
 
 ```css
 /*==================================
@@ -236,219 +187,29 @@ for integrating with [Homepage](https://gethomepage.dev/):
 }
 ```
 
-### User Activities Card
+## Docker Volumes and Configuration
 
-<img src="screenshots/Activity.png" alt="User Activity">
-
-`services.yaml`
-
-```yaml
-- Activity:
-    - Activity:
-        id: list
-        widgets:
-          - type: customapi
-            url: http://your-tautulli-host:3010/api/users
-            method: GET
-            display: list
-            mappings:
-              - field:
-                  response:
-                    data:
-                      0: name
-                additionalField:
-                  field:
-                    response:
-                      data:
-                        0: watched
-              - field:
-                  response:
-                    data:
-                      1: name
-                additionalField:
-                  field:
-                    response:
-                      data:
-                        1: watched
-              - field:
-                  response:
-                    data:
-                      2: name
-                additionalField:
-                  field:
-                    response:
-                      data:
-                        2: watched
-              - field:
-                  response:
-                    data:
-                      3: name
-                additionalField:
-                  field:
-                    response:
-                      data:
-                        3: watched
-              - field:
-                  response:
-                    data:
-                      4: name
-                additionalField:
-                  field:
-                    response:
-                      data:
-                        4: watched
-              - field:
-                  response:
-                    data:
-                      5: name
-                additionalField:
-                  field:
-                    response:
-                      data:
-                        5: watched
-```
-
-`custom.css`
-
-```css
-/*==================================
-  LIST STYLES
-==================================*/
-
-#list > div > div.relative.flex.flex-row.w-full.service-container > div > div {
-  display: block;
-  text-align: right;
-}
-
-#list
-  > div
-  > div.relative.flex.flex-row.w-full.service-container
-  > div
-  > div
-  > div.flex.flex-row.text-right
-  > div:nth-child(1) {
-  text-align: right;
-  margin-left: 0.5rem;
-}
-
-#list
-  > div
-  > div.relative.flex.flex-row.w-full.service-container
-  > div
-  > div
-  > div.flex.flex-row.text-right
-  > div:nth-child(2) {
-  text-align: left;
-  margin-left: auto;
-}
-```
-
-### Media Count Card
-
-<img src="screenshots/Count.png" alt="Media Count">
-
-`services.yaml`
-
-```yaml
-- Media Count:
-    - Media Count:
-        widgets:
-          - type: customapi
-            url: http://your-tautulli-host:3010/api/libraries
-            method: GET
-            display: block
-            mappings:
-              - field:
-                  response:
-                    data:
-                      0: count
-                format: numbers
-                label: Movies
-          - type: customapi
-            url: http://your-tautulli-host:3010/api/libraries
-            method: GET
-            display: block
-            mappings:
-              - field:
-                  response:
-                    data:
-                      1: count
-                format: numbers
-                label: Shows
-              - field:
-                  response:
-                    data:
-                      1: parent_count
-                format: numbers
-                label: Seasons
-              - field:
-                  response:
-                    data:
-                      1: child_count
-                format: numbers
-                label: Episodes
-```
-
-### Example API responses
-
-Movies Response:
-
-```json
-{
-  "response": {
-    "result": "success",
-    "message": "",
-    "data": [
-      {
-        "media_type": "movies",
-        "section_id": "2",
-        "title": "Homestead -  (2024) 1h 51m",
-        "content_rating": "PG-13",
-        "video_resolution": "720p",
-        "added_at_relative": "9h ago",
-        "added_at_short": "Feb 10"
-      }
-    ],
-    "section": 2
-  }
-}
-```
-
-Shows Response:
-
-```json
-{
-  "response": {
-    "result": "success",
-    "message": "",
-    "data": [
-      {
-        "media_type": "shows",
-        "section_id": "10",
-        "title": "Blue Exorcist - (S05E06) 23m",
-        "content_rating": "TV-14",
-        "video_resolution": "720p",
-        "added_at_relative": "2d ago",
-        "added_at_short": "Feb 8"
-      }
-    ],
-    "sections": [3, 10]
-  }
-}
-```
-
-### Volume Mounts
-
+### Volumes
 - `/app/config`: Persistent configuration storage
+  - `settings.json`: User and media format settings
+  - Created automatically on first run
 
 ### Health Checks
-
 The container includes health checks to monitor:
-
-- Web server availability
+- Web server availability (port 3010)
 - Tautulli connection status
 - Configuration persistence
 
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Tautulli team for their excellent media server monitoring solution
+- Homepage team for inspiration on the dashboard design
+- React and Node.js communities for their excellent tools and libraries
+
 ## Note
 
-This project is not affiliated with Tautulli or Plex Inc.
+This project is not affiliated with Tautulli or Plex Inc. All product names, logos, and brands are property of their respective owners.

@@ -1,6 +1,6 @@
 const express = require('express');
-const axios = require('axios');
 const { getSettings, saveSettings } = require('../services/settings');
+const cache = require('../services/cache');
 
 const router = express.Router();
 
@@ -14,7 +14,6 @@ function formatTimeHHMM(totalSeconds) {
 function formatShowTitle(session) {
   if (!session) return '';
   if (session.grandparent_title && session.parent_media_index && session.media_index) {
-    // Remove year from grandparent_title (show name)
     const showTitle = session.grandparent_title.replace(/\s*\(\d{4}\)|\s+[-–]\s+\d{4}/, '');
     return `${showTitle} - S${String(session.parent_media_index).padStart(2, '0')}E${String(session.media_index).padStart(2, '0')}`;
   }
@@ -33,23 +32,6 @@ function formatTimeDiff(timestamp) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-async function getUserHistory(baseUrl, apiKey, userId) {
-  try {
-    const response = await axios.get(`${baseUrl}/api/v2`, {
-      params: {
-        apikey: apiKey,
-        cmd: 'get_history',
-        user_id: userId,
-        length: 1
-      }
-    });
-    return response.data?.response?.data?.data?.[0];
-  } catch (error) {
-    console.error(`Error fetching history for user ${userId}:`, error.message);
-    return null;
-  }
-}
-
 router.get('/', async (req, res) => {
   try {
     const { 
@@ -63,19 +45,17 @@ router.get('/', async (req, res) => {
     const settings = await getSettings();
     const formatFields = settings.userFormats?.fields || [];
 
-    if (!process.env.TAUTULLI_BASE_URL || !process.env.TAUTULLI_API_KEY) {
-      throw new Error('Tautulli configuration missing');
+    // Get user data from cache
+    const cachedData = cache.get('users');
+    if (!cachedData) {
+      throw new Error('User data not available');
     }
 
-    const activityResponse = await axios.get(`${process.env.TAUTULLI_BASE_URL}/api/v2`, {
-      params: {
-        apikey: process.env.TAUTULLI_API_KEY,
-        cmd: 'get_activity'
-      }
-    });
-
+    const { activity, users } = cachedData;
     const watchingUsers = {};
-    activityResponse.data.response.data.sessions?.forEach(session => {
+
+    // Process active sessions
+    activity.sessions?.forEach(session => {
       if (session.state === 'playing') {
         watchingUsers[session.user_id] = {
           current_media: session.grandparent_title ? `${session.grandparent_title} - ${session.title}` : session.title,
@@ -92,44 +72,17 @@ router.get('/', async (req, res) => {
       }
     });
 
-    const usersResponse = await axios.get(`${process.env.TAUTULLI_BASE_URL}/api/v2`, {
-      params: {
-        apikey: process.env.TAUTULLI_API_KEY,
-        cmd: 'get_users_table',
-        order_column,
-        order_dir,
-        search,
-        length: 1000
-      }
-    });
-
-    const allUsers = usersResponse.data.response.data.data;
-    const recordsTotal = usersResponse.data.response.data.recordsTotal || allUsers.length;
-
-    const transformedUsers = await Promise.all(allUsers.map(async user => {
+    // Transform user data
+    const transformedUsers = users.data.map(user => {
       const watching = watchingUsers[user.user_id];
       const lastSeen = watching ? watching.last_seen : parseInt(user.last_seen, 10);
-
-      let lastPlayedModified = '';
-      if (watching) {
-        lastPlayedModified = watching.last_played_modified;
-      } else if (user.last_played) {
-        const lastSession = await getUserHistory(
-          process.env.TAUTULLI_BASE_URL,
-          process.env.TAUTULLI_API_KEY,
-          user.user_id
-        );
-        lastPlayedModified = lastSession ? formatShowTitle(lastSession) : user.last_played;
-      } else {
-        lastPlayedModified = 'Nothing';
-      }
 
       const baseUser = {
         friendly_name: user.friendly_name || '',
         total_plays: parseInt(user.plays || '0', 10),
         is_watching: watching ? 'Watching' : 'Watched',
         last_played: watching ? watching.current_media : (user.last_played || 'Nothing'),
-        last_played_modified: lastPlayedModified,
+        last_played_modified: watching ? watching.last_played_modified : user.last_played || 'Nothing',
         media_type: watching ? watching.media_type.charAt(0).toUpperCase() + watching.media_type.slice(1) : 
                    (user.media_type ? user.media_type.charAt(0).toUpperCase() + user.media_type.slice(1) : ''),
         progress_percent: watching ? `${watching.progress_percent}%` : '',
@@ -150,15 +103,31 @@ router.get('/', async (req, res) => {
         acc._is_watching = !!watching;
         return acc;
       }, {});
-    }));
+    });
 
+    // Sort users
     const sortedUsers = transformedUsers.sort((a, b) => {
       if (a._is_watching && !b._is_watching) return -1;
       if (!a._is_watching && b._is_watching) return 1;
       return (b._last_seen || 0) - (a._last_seen || 0);
     });
 
-    const paginatedUsers = sortedUsers.slice(parseInt(start), parseInt(start) + parseInt(length));
+    // Apply search filter
+    const filteredUsers = search
+      ? sortedUsers.filter(user => 
+          Object.values(user)
+            .filter(val => typeof val === 'string')
+            .some(val => val.toLowerCase().includes(search.toLowerCase()))
+        )
+      : sortedUsers;
+
+    // Apply pagination
+    const paginatedUsers = filteredUsers.slice(
+      parseInt(start), 
+      parseInt(start) + parseInt(length)
+    );
+
+    // Clean up internal properties
     const cleanedUsers = paginatedUsers.map(({ _last_seen, _is_watching, ...user }) => user);
 
     res.json({ 
@@ -166,7 +135,7 @@ router.get('/', async (req, res) => {
         result: 'success',
         data: cleanedUsers,
         recordsTotal: sortedUsers.length,
-        recordsFiltered: sortedUsers.length,
+        recordsFiltered: filteredUsers.length,
         draw: parseInt(req.query.draw) || 1
       }
     });

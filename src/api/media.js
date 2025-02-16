@@ -1,6 +1,6 @@
 const express = require('express');
-const axios = require('axios');
 const { getSettings, saveSettings } = require('../services/settings');
+const cache = require('../services/cache');
 
 const router = express.Router();
 
@@ -8,7 +8,6 @@ const router = express.Router();
 function formatDuration(duration) {
   if (!duration) return '';
   
-  // Convert to seconds (divide by 1000)
   const seconds = Math.floor(parseInt(duration) / 1000);
   const minutes = Math.floor(seconds / 60);
   
@@ -26,7 +25,7 @@ function formatDuration(duration) {
   return `${hours}h ${remainingMinutes}m`;
 }
 
-// Format timestamp to relative time
+// Format relative time
 function formatRelativeTime(timestamp) {
   if (!timestamp) return '';
   const now = Math.floor(Date.now() / 1000);
@@ -40,46 +39,25 @@ function formatRelativeTime(timestamp) {
   return `${Math.floor(diff / 2592000)}mo ago`;
 }
 
-// Format timestamp to short date
+// Format short date
 function formatShortDate(timestamp) {
   if (!timestamp) return '';
   const date = new Date(timestamp * 1000);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-// Get metadata for a specific item
-async function getItemMetadata(ratingKey, baseUrl, apiKey) {
-  try {
-    const response = await axios.get(`${baseUrl}/api/v2`, {
-      params: {
-        apikey: apiKey,
-        cmd: 'get_metadata',
-        rating_key: ratingKey
-      }
-    });
-    
-    const metadata = response.data?.response?.data;
-    return {
-      content_rating: metadata?.content_rating || '',
-      video_resolution: metadata?.media_info?.[0]?.video_full_resolution || metadata?.media_info?.[0]?.video_resolution || ''
-    };
-  } catch (error) {
-    console.error(`Error fetching metadata for item ${ratingKey}:`, error.message);
-    return { content_rating: '', video_resolution: '' };
-  }
+  return date.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric'
+  });
 }
 
 // Format a single item based on format fields
 function formatItem(item, formatFields) {
-  // Return empty object if no format fields configured
   if (!formatFields?.length) {
     return {};
   }
 
-  // Format duration before template processing
   const formattedDuration = formatDuration(item.duration);
+  const timestamp = parseInt(item.added_at);
 
-  // Apply format fields
   const result = {};
   formatFields.forEach(field => {
     if (!field.id || !field.template) return;
@@ -94,8 +72,8 @@ function formatItem(item, formatFields) {
       duration: formattedDuration,
       content_rating: item.content_rating || '',
       video_resolution: item.video_resolution || '',
-      added_at_relative: item.added_at_relative || '',
-      added_at_short: item.added_at_short || ''
+      added_at_relative: formatRelativeTime(timestamp),
+      added_at_short: formatShortDate(timestamp)
     };
 
     Object.entries(variables).forEach(([key, val]) => {
@@ -145,18 +123,15 @@ router.get('/:type(shows|movies)/:sectionId?', async (req, res) => {
     const { type, sectionId } = req.params;
     const { count = 5 } = req.query;
     
-    // Get settings
+    // Get settings and cached media data
     const settings = await getSettings();
     const configuredSections = settings.sections?.[type] || [];
     const formats = settings.mediaFormats?.[type] || {};
-
-    // Verify Tautulli configuration
-    if (!process.env.TAUTULLI_BASE_URL || !process.env.TAUTULLI_API_KEY) {
-      throw new Error('Tautulli configuration missing');
+    
+    const cachedMedia = cache.get('recent_media');
+    if (!cachedMedia) {
+      throw new Error('Media data not available');
     }
-
-    const baseUrl = process.env.TAUTULLI_BASE_URL.replace(/\/+$/, '');
-    const apiKey = process.env.TAUTULLI_API_KEY;
 
     // Handle single section request
     if (sectionId) {
@@ -165,29 +140,14 @@ router.get('/:type(shows|movies)/:sectionId?', async (req, res) => {
         throw new Error(`Section ${sectionId} not configured for ${type}`);
       }
 
-      const response = await axios.get(`${baseUrl}/api/v2`, {
-        params: {
-          apikey: apiKey,
-          cmd: 'get_recently_added',
-          section_id: section,
-          count: parseInt(count)
-        }
-      });
+      const sectionData = cachedMedia.find(
+        item => item.type === type && item.sectionId === section
+      );
 
-      const items = response.data?.response?.data?.recently_added || [];
       const formatFields = formats?.[section]?.fields || [];
-
-      const formattedItems = await Promise.all(items.map(async (item) => {
-        const metadata = await getItemMetadata(item.rating_key, baseUrl, apiKey);
-        const added_at = parseInt(item.added_at);
-
-        return formatItem({
-          ...item,
-          ...metadata,
-          added_at_relative: formatRelativeTime(added_at),
-          added_at_short: formatShortDate(added_at)
-        }, formatFields);
-      }));
+      const formattedItems = (sectionData?.data || [])
+        .slice(0, parseInt(count))
+        .map(item => formatItem(item, formatFields));
 
       return res.json({
         response: {
@@ -199,41 +159,21 @@ router.get('/:type(shows|movies)/:sectionId?', async (req, res) => {
     }
 
     // Handle all sections request
-    const promises = configuredSections.map(section =>
-      axios.get(`${baseUrl}/api/v2`, {
-        params: {
-          apikey: apiKey,
-          cmd: 'get_recently_added',
-          section_id: section,
-          count: parseInt(count)
-        }
-      }).catch(() => ({
-        data: { response: { data: { recently_added: [] } } }
-      }))
+    const relevantMedia = cachedMedia.filter(
+      item => item.type === type && configuredSections.includes(item.sectionId)
     );
 
-    const responses = await Promise.all(promises);
-    const allItems = responses.flatMap((response, index) => {
-      const sectionId = configuredSections[index];
-      const items = response.data?.response?.data?.recently_added || [];
-      return items.map(item => ({ ...item, section_id: sectionId.toString() }));
-    });
+    const allItems = relevantMedia.flatMap(section => 
+      section.data.map(item => ({ ...item, section_id: section.sectionId.toString() }))
+    );
 
     const sortedItems = allItems
       .sort((a, b) => parseInt(b.added_at) - parseInt(a.added_at))
       .slice(0, parseInt(count));
 
-    const formattedItems = await Promise.all(sortedItems.map(async (item) => {
-      const metadata = await getItemMetadata(item.rating_key, baseUrl, apiKey);
-      const added_at = parseInt(item.added_at);
-
-      return formatItem({
-        ...item,
-        ...metadata,
-        added_at_relative: formatRelativeTime(added_at),
-        added_at_short: formatShortDate(added_at)
-      }, formats?.[item.section_id]?.fields || []);
-    }));
+    const formattedItems = sortedItems.map(item => 
+      formatItem(item, formats?.[item.section_id]?.fields || [])
+    );
 
     res.json({
       response: {

@@ -91,5 +91,6 @@ module.exports = {
   logServerStart,
   logError,
   logRequest,
+  log,
   colors
 };

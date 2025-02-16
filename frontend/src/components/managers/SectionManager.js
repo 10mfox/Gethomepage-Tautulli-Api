@@ -18,20 +18,38 @@ const SectionManager = ({ onError, onSuccess }) => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [settingsResponse, sectionsResponse] = await Promise.all([
+      const [settingsResponse, librariesResponse] = await Promise.all([
         fetch('/api/media/settings'),
-        fetch('/api/libraries/sections')
+        fetch('/api/libraries')
       ]);
 
-      if (!settingsResponse.ok || !sectionsResponse.ok) {
+      if (!settingsResponse.ok || !librariesResponse.ok) {
         throw new Error('Failed to fetch data');
       }
 
       const settingsData = await settingsResponse.json();
-      const sectionsData = await sectionsResponse.json();
+      const librariesData = await librariesResponse.json();
 
+      console.log('Libraries response:', librariesData);
+
+      // Setup configured sections from settings
       setSections(settingsData.sections || { shows: [], movies: [] });
-      setAvailableSections(sectionsData.response.data || []);
+
+      // Get available sections
+      if (librariesData?.response?.sections) {
+        const available = librariesData.response.sections.map(library => ({
+          id: library.section_id,
+          name: library.section_name,
+          type: library.section_type === 'movie' ? 'movies' : 'shows',
+          count: library.count,
+          count_formatted: library.count_formatted,
+          extra: library.section_type === 'show' ? {
+            seasons: library.parent_count_formatted,
+            episodes: library.child_count_formatted
+          } : null
+        }));
+        setAvailableSections(available);
+      }
     } catch (error) {
       console.error('Failed to load data:', error);
       onError('Failed to load section settings');
@@ -95,6 +113,21 @@ const SectionManager = ({ onError, onSuccess }) => {
     const availableForType = availableSections.filter(section => section.type === type);
     const selectedIds = sections[type];
 
+    if (loading) {
+      return (
+        <div className="flex-1">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white capitalize">
+              {type}
+            </h3>
+          </div>
+          <div className="p-4 text-center text-gray-400 border border-gray-700 rounded-lg">
+            Loading...
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex-1">
         <div className="flex items-center justify-between mb-4">
@@ -135,7 +168,14 @@ const SectionManager = ({ onError, onSuccess }) => {
                     className="rounded border-gray-600 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="text-gray-300 flex-1">{section.name}</span>
-                  <span className="text-sm text-gray-500">ID: {section.id}</span>
+                  <div className="text-sm text-gray-500 text-right">
+                    <div>{section.count_formatted} items</div>
+                    {section.extra && (
+                      <div className="text-xs">
+                        {section.extra.seasons} seasons, {section.extra.episodes} episodes
+                      </div>
+                    )}
+                  </div>
                 </label>
               </div>
             ))
@@ -150,14 +190,6 @@ const SectionManager = ({ onError, onSuccess }) => {
       </div>
     );
   };
-
-  if (loading && !refreshing) {
-    return (
-      <div className="flex justify-center items-center p-8">
-        <div className="loading-spinner" />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
