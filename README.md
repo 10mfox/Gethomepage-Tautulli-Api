@@ -154,6 +154,8 @@ POST /api/cache/clear        # Clear system cache
 | ${added_at_relative} | Relative time | "2d ago" |
 | ${added_at_short} | Short date | "Feb 10" |
 
+### Custom CSS for Homepage custom api's 
+
 ```css
 /*==================================
   LIST STYLES
