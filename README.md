@@ -48,8 +48,6 @@ A web application that combines user activity monitoring, media format managemen
 
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
-| TAUTULLI_BASE_URL | Base URL of your Tautulli instance | Yes | - |
-| TAUTULLI_API_KEY | API key from Tautulli | Yes | - |
 | TAUTULLI_CUSTOM_PORT | Port for the web interface | No | 3010 |
 
 ## Quick Start
@@ -64,8 +62,6 @@ services:
     container_name: tautulli-api-manager
     environment:
       - TAUTULLI_CUSTOM_PORT=3010
-      - TAUTULLI_BASE_URL=http://your-tautulli-host:8181
-      - TAUTULLI_API_KEY=your_api_key
     ports:
       - "3010:3010"
     volumes:
