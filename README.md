@@ -1,8 +1,8 @@
 # Tautulli Unified Manager
 
-A web application that combines user activity monitoring, media format management, and library statistics for Tautulli. Provides customizable display formats, real-time status tracking, and section management through an intuitive interface.
+A comprehensive web application that combines user activity monitoring, media format management, and library statistics for Tautulli. Provides customizable display formats, real-time status tracking, and section management through an intuitive interface with multiple theme options.
 
-![Homelab (18)](https://github.com/user-attachments/assets/0d8a31e7-59c5-4c19-aa7f-5aa4b9157e82)
+![Dashboard Preview](https://github.com/user-attachments/assets/0d8a31e7-59c5-4c19-aa7f-5aa4b9157e82)
 
 ## Features
 
@@ -14,6 +14,7 @@ A web application that combines user activity monitoring, media format managemen
 - User search and filtering capabilities
 - Detailed user activity history
 - Online/offline status indicators
+- Transcode/Direct Play status indicators
 
 ### Media Management
 - Section-based organization for movies and TV shows
@@ -21,7 +22,7 @@ A web application that combines user activity monitoring, media format managemen
 - Recently added content tracking per section
 - Multiple section support with individual views
 - Dynamic template system for media titles
-- Individual section statistics
+- Individual section statistics and filtering
 
 ### Library Statistics
 - Complete library section overview
@@ -29,13 +30,16 @@ A web application that combines user activity monitoring, media format managemen
 - TV show, season, and episode counts
 - Section-specific statistics
 - Sorted by section ID for easy reference
+- Combined totals for all libraries
 
 ### General Features
 - Dark mode responsive UI optimized for all devices
+- Multiple theme options with customizable colors
 - Persistent configuration storage
 - Real-time updates and live status indicators
 - Docker deployment with volume support
 - Comprehensive API endpoints
+- Homepage integration with YAML configuration generator
 
 ## Prerequisites
 
@@ -69,6 +73,24 @@ services:
     restart: unless-stopped
 ```
 
+Or this if you are having issues getting it to start on linux:
+
+```yaml
+version: "3"
+services:
+  tautulli-manager:
+    image: ghcr.io/10mfox/gethomepage-tautulli-api:latest
+    container_name: tautulli-api-manager
+    user: "1000:1000"  # Replace with your user ID and group ID	
+    environment:
+      - TAUTULLI_CUSTOM_PORT=3010
+    ports:
+      - "3010:3010"
+    volumes:
+      - ./config:/app/config
+    restart: unless-stopped
+```
+
 2. Start the container:
 ```bash
 docker compose up -d
@@ -87,26 +109,20 @@ POST /api/users/format-settings # Update user format settings
 
 ### Media Management
 ```
-GET /api/recent/movies          # Get all recent movies
-GET /api/recent/shows           # Get all recent shows
-GET /api/recent/movies/:id      # Get recent movies for section
-GET /api/recent/shows/:id       # Get recent shows for section
-GET /api/media/settings         # Get media format settings
-POST /api/media/settings        # Update media format settings
-```
-
-### Library Management
-```
-GET /api/libraries             # Get all library sections
-GET /api/libraries/sections    # Get configured sections
-GET /api/libraries/:id        # Get specific library details
+GET /api/media/recent           # Get recent media from all configured sections
+GET /api/media/recent?type=movies    # Filter by media type
+GET /api/media/recent?type=shows     # Filter by media type
+GET /api/media/recent?section=1,2    # Filter by specific section IDs
+GET /api/media/settings              # Get media format settings
+POST /api/media/settings             # Update media format settings
 ```
 
 ### System
 ```
 GET /api/health               # Health check endpoint
-GET /api/config              # Get system configuration
-POST /api/cache/clear        # Clear system cache
+GET /api/config               # Get system configuration
+POST /api/config              # Update system configuration
+POST /api/cache/clear         # Clear system cache
 ```
 
 ## Display Format Variables
@@ -150,39 +166,51 @@ POST /api/cache/clear        # Clear system cache
 | ${added_at_relative} | Relative time | "2d ago" |
 | ${added_at_short} | Short date | "Feb 10" |
 
-### Custom CSS for Homepage custom api's 
+## Homepage Integration
 
-```css
-/*==================================
-  LIST STYLES
-==================================*/
+Tautulli Unified Manager provides built-in configuration generation for the [Homepage](https://gethomepage.dev/) dashboard. The application automatically generates YAML configuration based on your configured sections and formatting preferences.
 
-#list > div > div.relative.flex.flex-row.w-full.service-container > div > div {
-  display: block;
-  text-align: right;
-}
+### Available Widgets
+- **User Activity**: Display current watching users with status
+- **Recently Added Media**: Show recently added content per section or combined
+- **Media Count**: Display library statistics with formatted numbers
 
-#list
-  > div
-  > div.relative.flex.flex-row.w-full.service-container
-  > div
-  > div
-  > div.flex.flex-row.text-right
-  > div:nth-child(1) {
-  text-align: right;
-  margin-left: 0.5rem;
-}
+### Configuration Options
+- Combine/split sections in Recently Added view
+- Include/exclude count statistics in section views
+- Use formatted/raw numbers for statistics
+- Adjust the number of items displayed in each section
 
-#list
-  > div
-  > div.relative.flex.flex-row.w-full.service-container
-  > div
-  > div
-  > div.flex.flex-row.text-right
-  > div:nth-child(2) {
-  text-align: left;
-  margin-left: auto;
-}
+### Example Homepage Configuration
+```yaml
+- Activity:                     
+    - Activity:
+         id: list
+         widgets:
+           - type: customapi
+             url: http://192.168.1.100:3010/api/users
+             method: GET
+             display: list
+             mappings:
+               - field:
+                   response:
+                     data:
+                       0: field
+
+- Recently Added:
+    - Movies:
+        icon: mdi-filmstrip
+        id: list
+        widgets:
+          - type: customapi
+            url: http://192.168.1.100:3010/api/media/recent?type=movies&section=1,2
+            method: GET
+            display: list
+            mappings:
+              - field:
+                  response:
+                    data:
+                      0: field
 ```
 
 ## Docker Volumes and Configuration
@@ -197,6 +225,23 @@ The container includes health checks to monitor:
 - Web server availability (port 3010)
 - Tautulli connection status
 - Configuration persistence
+
+## Theme Options
+
+Tautulli Unified Manager includes multiple theme options:
+
+- Dark (Blue/Cyan)
+- Cyberpunk (Pink/Cyan)
+- Matrix (Green/Emerald)
+- Synthwave (Purple/Pink)
+- Crimson (Red/Orange)
+- Ocean (Cyan/Blue)
+- Forest (Emerald/Green)
+- Sunset (Orange/Yellow)
+- Midnight (Indigo/Violet)
+- Monochrome (Gray/Slate)
+
+Themes can be changed via the theme switcher in the navigation bar and are persisted between sessions.
 
 ## License
 

@@ -1,54 +1,51 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Settings } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import ThemeSwitcher from './ThemeSwitcher';
 
-const Nav = () => {
-  const location = useLocation();
-
-  const routes = [
-    {
-      path: '/',
-      label: 'Dashboard',
-      icon: LayoutDashboard
-    },
-    {
-      path: '/format',
-      label: 'Format Settings',
-      icon: Settings
-    }
-  ];
-
+const Nav = ({ leftItems, rightItems, activeView, onViewChange }) => {
   return (
-    <nav className="bg-gray-800 border-b border-gray-700">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          <div className="flex items-center">
-            <Link to="/" className="flex items-center">
-              <span className="text-xl font-bold text-white">
-                Tautulli Manager
-              </span>
+    <div className="nav-container">
+      <div className="nav-content">
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-8">
+            <Link to="/" className="text-xl font-semibold text-white">
+              Tautulli Manager
             </Link>
+            
+            {/* Left Navigation */}
+            <div className="flex gap-8">
+              {leftItems.map(({ id, label }) => (
+                <button
+                  key={id}
+                  onClick={() => onViewChange(id)}
+                  className={`tab-button ${activeView === id ? 'active' : ''}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="flex space-x-4">
-            {routes.map(({ path, label, icon: Icon }) => (
-              <Link
-                key={path}
-                to={path}
-                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium ${
-                  location.pathname === path
-                    ? 'bg-gray-900 text-white'
-                    : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </Link>
-            ))}
+          <div className="flex items-center gap-8">
+            {/* Right Navigation */}
+            <div className="flex gap-8">
+              {rightItems.map(({ id, label }) => (
+                <button
+                  key={id}
+                  onClick={() => onViewChange(id)}
+                  className={`tab-button ${activeView === id ? 'active' : ''}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Theme Switcher */}
+            <ThemeSwitcher />
           </div>
         </div>
       </div>
-    </nav>
+    </div>
   );
 };
 

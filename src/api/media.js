@@ -1,6 +1,7 @@
 const express = require('express');
 const { getSettings, saveSettings } = require('../services/settings');
 const cache = require('../services/cache');
+const { tautulliService } = require('../services/tautulli');
 
 const router = express.Router();
 
@@ -86,6 +87,85 @@ function formatItem(item, formatFields) {
   return result;
 }
 
+// Helper function to process library data
+async function getLibraryData() {
+  try {
+    const response = await tautulliService.makeRequest('get_libraries_table');
+    if (!response?.response?.data?.data) {
+      throw new Error('Invalid library data format');
+    }
+
+    const settings = await getSettings();
+    const configuredSections = {
+      movies: settings.sections?.movies || [],
+      shows: settings.sections?.shows || []
+    };
+
+    // Process sections and mark configured ones
+    const sections = response.response.data.data
+      .map(library => {
+        const isConfigured = library.section_type === 'movie' ? 
+          configuredSections.movies.includes(library.section_id) :
+          library.section_type === 'show' ? 
+          configuredSections.shows.includes(library.section_id) : 
+          false;
+
+        return {
+          section_name: library.section_name,
+          section_type: library.section_type,
+          count: parseInt(library.count) || 0,
+          section_id: parseInt(library.section_id), // Ensure numeric sorting
+          count_formatted: new Intl.NumberFormat().format(parseInt(library.count) || 0),
+          configured: isConfigured,
+          ...(library.section_type === 'show' ? {
+            parent_count: parseInt(library.parent_count) || 0,
+            child_count: parseInt(library.child_count) || 0,
+            parent_count_formatted: new Intl.NumberFormat().format(parseInt(library.parent_count) || 0),
+            child_count_formatted: new Intl.NumberFormat().format(parseInt(library.child_count) || 0)
+          } : {})
+        };
+      })
+      .sort((a, b) => a.section_id - b.section_id); // Sort by section ID
+
+    // Calculate totals
+    const totals = {
+      movies: { sections: 0, total_items: 0, total_items_formatted: '0' },
+      shows: { sections: 0, total_items: 0, total_items_formatted: '0', total_seasons: 0, total_seasons_formatted: '0', total_episodes: 0, total_episodes_formatted: '0' }
+    };
+
+    sections.forEach(library => {
+      if (!library.configured) return;
+      
+      if (library.section_type === 'movie') {
+        totals.movies.sections++;
+        totals.movies.total_items += library.count;
+      } else if (library.section_type === 'show') {
+        totals.shows.sections++;
+        totals.shows.total_items += library.count;
+        totals.shows.total_seasons += library.parent_count;
+        totals.shows.total_episodes += library.child_count;
+      }
+    });
+
+    // Format total numbers
+    totals.movies.total_items_formatted = new Intl.NumberFormat().format(totals.movies.total_items);
+    totals.shows.total_items_formatted = new Intl.NumberFormat().format(totals.shows.total_items);
+    totals.shows.total_seasons_formatted = new Intl.NumberFormat().format(totals.shows.total_seasons);
+    totals.shows.total_episodes_formatted = new Intl.NumberFormat().format(totals.shows.total_episodes);
+
+    return { sections, totals };
+  } catch (error) {
+    console.error('Library data error:', error);
+    return {
+      sections: [],
+      totals: {
+        movies: { sections: 0, total_items: 0, total_items_formatted: '0' },
+        shows: { sections: 0, total_items: 0, total_items_formatted: '0', total_seasons: 0, total_seasons_formatted: '0', total_episodes: 0, total_episodes_formatted: '0' }
+      }
+    };
+  }
+}
+
 // Get media settings
 router.get('/settings', async (req, res) => {
   try {
@@ -117,69 +197,80 @@ router.post('/settings', async (req, res) => {
   }
 });
 
-// Get recently added media
-router.get('/:type(shows|movies)/:sectionId?', async (req, res) => {
+// Unified media endpoint
+router.get('/recent', async (req, res) => {
   try {
-    const { type, sectionId } = req.params;
-    const { count = 5 } = req.query;
+    const { type, count = 15, section } = req.query;
+    
+    // Ensure count doesn't exceed max
+    const itemCount = Math.min(parseInt(count) || 15, 15);
     
     // Get settings and cached media data
     const settings = await getSettings();
-    const configuredSections = settings.sections?.[type] || [];
-    const formats = settings.mediaFormats?.[type] || {};
-    
+    const formats = settings.mediaFormats || {};
     const cachedMedia = cache.get('recent_media');
+    
     if (!cachedMedia) {
       throw new Error('Media data not available');
     }
 
-    // Handle single section request
-    if (sectionId) {
-      const section = parseInt(sectionId);
-      if (!configuredSections.includes(section)) {
-        throw new Error(`Section ${sectionId} not configured for ${type}`);
-      }
+    // Determine which types to include
+    const validTypes = ['shows', 'movies'];
+    let typesToInclude = type ? 
+      type.split(',').filter(t => validTypes.includes(t)) : 
+      validTypes;
 
-      const sectionData = cachedMedia.find(
-        item => item.type === type && item.sectionId === section
-      );
-
-      const formatFields = formats?.[section]?.fields || [];
-      const formattedItems = (sectionData?.data || [])
-        .slice(0, parseInt(count))
-        .map(item => formatItem(item, formatFields));
-
-      return res.json({
-        response: {
-          result: 'success',
-          data: formattedItems,
-          section
-        }
-      });
+    if (typesToInclude.length === 0) {
+      throw new Error('No valid media types specified');
     }
 
-    // Handle all sections request
-    const relevantMedia = cachedMedia.filter(
-      item => item.type === type && configuredSections.includes(item.sectionId)
-    );
+    // Get all sections for included types
+    const sectionsToUse = {};
+    typesToInclude.forEach(mediaType => {
+      const configuredSections = settings.sections?.[mediaType] || [];
+      // Filter by section if provided
+      if (section) {
+        const requestedSections = section.split(',').map(s => parseInt(s.trim()));
+        sectionsToUse[mediaType] = configuredSections.filter(s => requestedSections.includes(s));
+      } else {
+        sectionsToUse[mediaType] = configuredSections;
+      }
+    });
 
-    const allItems = relevantMedia.flatMap(section => 
-      section.data.map(item => ({ ...item, section_id: section.sectionId.toString() }))
-    );
+    // Get all media items in a single array
+    const allItems = [];
+    
+    typesToInclude.forEach(mediaType => {
+      const relevantMedia = cachedMedia.filter(
+        item => item.type === mediaType && sectionsToUse[mediaType].includes(item.sectionId)
+      );
 
-    const sortedItems = allItems
-      .sort((a, b) => parseInt(b.added_at) - parseInt(a.added_at))
-      .slice(0, parseInt(count));
+      relevantMedia.forEach(section => {
+        const formatFields = formats[mediaType]?.[section.sectionId]?.fields || [];
+        const items = section.data
+          .map(item => ({
+            ...formatItem(item, formatFields),
+            added_at: parseInt(item.added_at),
+            media_type: mediaType,
+            section_id: section.sectionId
+          }))
+          .slice(0, itemCount); // Limit items per section
 
-    const formattedItems = sortedItems.map(item => 
-      formatItem(item, formats?.[item.section_id]?.fields || [])
-    );
+        allItems.push(...items);
+      });
+    });
+
+    // Sort all items by added_at and take top items
+    const sortedItems = allItems.sort((a, b) => b.added_at - a.added_at);
+
+    // Get library data
+    const libraryData = await getLibraryData();
 
     res.json({
       response: {
         result: 'success',
-        data: formattedItems,
-        sections: configuredSections
+        data: sortedItems,
+        libraries: libraryData
       }
     });
 

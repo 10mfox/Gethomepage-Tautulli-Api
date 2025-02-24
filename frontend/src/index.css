@@ -2,18 +2,405 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme Variables */
+:root[data-theme="dark"] {
+  --primary: 37 99 235;
+  --primary-light: 59 130 246;
+  --primary-dark: 29 78 216;
+  --accent: 34 211 238;
+  --accent-light: 45 212 191;
+  --accent-dark: 17 94 89;
+  --background: 0 0 0;
+  --panel: 0 0 0;
+  --text: 255 255 255;
+  --text-secondary: 156 163 175;
+  --border: 255 255 255;
+}
+
+:root[data-theme="cyberpunk"] {
+  --primary: 236 72 153;
+  --primary-light: 244 114 182;
+  --primary-dark: 219 39 119;
+  --accent: 34 211 238;
+  --accent-light: 45 212 191;
+  --accent-dark: 17 94 89;
+  --background: 0 0 0;
+  --panel: 0 0 0;
+  --text: 255 255 255;
+  --text-secondary: 156 163 175;
+  --border: 255 255 255;
+}
+
+:root[data-theme="matrix"] {
+  --primary: 34 197 94;
+  --primary-light: 74 222 128;
+  --primary-dark: 22 163 74;
+  --accent: 16 185 129;
+  --accent-light: 20 184 166;
+  --accent-dark: 13 148 136;
+  --background: 0 0 0;
+  --panel: 0 0 0;
+  --text: 255 255 255;
+  --text-secondary: 156 163 175;
+  --border: 255 255 255;
+}
+
+:root[data-theme="synthwave"] {
+  --primary: 147 51 234;
+  --primary-light: 168 85 247;
+  --primary-dark: 126 34 206;
+  --accent: 236 72 153;
+  --accent-light: 244 114 182;
+  --accent-dark: 219 39 119;
+  --background: 0 0 0;
+  --panel: 0 0 0;
+  --text: 255 255 255;
+  --text-secondary: 156 163 175;
+  --border: 255 255 255;
+}
+
+:root[data-theme="crimson"] {
+  --primary: 239 68 68;
+  --primary-light: 248 113 113;
+  --primary-dark: 220 38 38;
+  --accent: 249 115 22;
+  --accent-light: 251 146 60;
+  --accent-dark: 234 88 12;
+  --background: 0 0 0;
+  --panel: 0 0 0;
+  --text: 255 255 255;
+  --text-secondary: 156 163 175;
+  --border: 255 255 255;
+}
+
+:root[data-theme="ocean"] {
+  --primary: 34 211 238;
+  --primary-light: 45 212 191;
+  --primary-dark: 17 94 89;
+  --accent: 37 99 235;
+  --accent-light: 59 130 246;
+  --accent-dark: 29 78 216;
+  --background: 0 0 0;
+  --panel: 0 0 0;
+  --text: 255 255 255;
+  --text-secondary: 156 163 175;
+  --border: 255 255 255;
+}
+
+:root[data-theme="forest"] {
+  --primary: 16 185 129;
+  --primary-light: 20 184 166;
+  --primary-dark: 13 148 136;
+  --accent: 34 197 94;
+  --accent-light: 74 222 128;
+  --accent-dark: 22 163 74;
+  --background: 0 0 0;
+  --panel: 0 0 0;
+  --text: 255 255 255;
+  --text-secondary: 156 163 175;
+  --border: 255 255 255;
+}
+
+:root[data-theme="sunset"] {
+  --primary: 249 115 22;
+  --primary-light: 251 146 60;
+  --primary-dark: 234 88 12;
+  --accent: 234 179 8;
+  --accent-light: 250 204 21;
+  --accent-dark: 202 138 4;
+  --background: 0 0 0;
+  --panel: 0 0 0;
+  --text: 255 255 255;
+  --text-secondary: 156 163 175;
+  --border: 255 255 255;
+}
+
+:root[data-theme="midnight"] {
+  --primary: 79 70 229;
+  --primary-light: 99 102 241;
+  --primary-dark: 67 56 202;
+  --accent: 139 92 246;
+  --accent-light: 167 139 250;
+  --accent-dark: 124 58 237;
+  --background: 0 0 0;
+  --panel: 0 0 0;
+  --text: 255 255 255;
+  --text-secondary: 156 163 175;
+  --border: 255 255 255;
+}
+
+:root[data-theme="monochrome"] {
+  --primary: 107 114 128;
+  --primary-light: 156 163 175;
+  --primary-dark: 75 85 99;
+  --accent: 71 85 105;
+  --accent-light: 100 116 139;
+  --accent-dark: 51 65 85;
+  --background: 0 0 0;
+  --panel: 0 0 0;
+  --text: 255 255 255;
+  --text-secondary: 156 163 175;
+  --border: 255 255 255;
+}
+
 @layer base {
   :root {
     color-scheme: dark;
   }
 
   body {
-    @apply bg-gray-900 text-gray-100;
+    @apply text-gray-100;
+  }
+
+  input, select, textarea {
+    @apply bg-black/20 border border-white/5 rounded text-white placeholder-gray-500
+           focus:outline-none focus:ring-2 focus:ring-opacity-50 focus:border-transparent
+           px-3 py-2;
+  }
+  
+  input:focus, select:focus, textarea:focus {
+    --tw-ring-color: rgb(var(--primary) / 0.5);
+  }
+
+  input[type="number"] {
+    @apply [appearance:textfield];
+  }
+
+  button {
+    @apply transition-all duration-200;
+  }
+  
+  a {
+    @apply transition-colors duration-200;
   }
 }
 
 @layer components {
-  .loading-spinner {
-    @apply w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin;
+  /* Dark Panel - Main container for sections */
+  .dark-panel {
+    @apply bg-black/20 backdrop-blur-sm rounded-lg border border-white/5;
   }
+
+  /* Panel Header */
+  .table-header {
+    @apply p-4 border-b border-white/5;
+  }
+
+  /* Common text styles */
+  .header-text {
+    @apply text-lg font-medium text-white;
+  }
+
+  .subheader-text {
+    @apply text-sm font-medium text-gray-300;
+  }
+
+  .description-text {
+    @apply text-sm text-gray-400;
+  }
+
+  /* Button Variants */
+  .btn-primary {
+    @apply px-4 py-2 rounded text-sm font-medium flex items-center gap-2 transition-colors
+           disabled:opacity-50 bg-opacity-90 hover:bg-opacity-100 text-white;
+    background-color: rgb(var(--primary));
+  }
+
+  .btn-secondary {
+    @apply bg-black/20 hover:bg-white/5 text-gray-300 hover:text-white px-4 py-2 
+           rounded text-sm font-medium flex items-center gap-2 transition-colors 
+           disabled:opacity-50;
+  }
+
+  .btn-accent {
+    @apply px-4 py-2 rounded text-sm font-medium flex items-center gap-2 transition-colors
+           disabled:opacity-50 bg-opacity-90 hover:bg-opacity-100 text-white;
+    background-color: rgb(var(--accent));
+  }
+
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-medium
+           flex items-center gap-2 transition-colors disabled:opacity-50;
+  }
+
+  /* Navigation Tabs */
+  .tab-button {
+    @apply flex items-center gap-2 text-sm font-medium transition-colors;
+  }
+
+  .tab-button.active {
+    color: rgb(var(--primary));
+  }
+
+  .tab-button:not(.active) {
+    @apply text-gray-400 hover:text-gray-300;
+  }
+
+  /* Table Styles */
+  .data-table {
+    @apply w-full divide-y divide-white/5;
+  }
+
+  .table-row {
+    @apply px-4 py-4 text-sm hover:bg-white/5 border-b border-white/5 last:border-0;
+  }
+
+  /* Alert Styles */
+  .alert {
+    @apply bg-black/20 border rounded-lg p-4 text-gray-300;
+    border-color: rgb(var(--primary) / 0.2);
+  }
+
+  .alert-info {
+    border-color: rgb(var(--accent) / 0.2);
+  }
+
+  .alert-warning {
+    @apply border-yellow-900/20;
+  }
+
+  .alert-error {
+    @apply border-red-900/20;
+  }
+
+  /* Status Badges */
+  .status-badge {
+    @apply px-3 py-1 text-xs font-medium rounded-md;
+    background-color: rgb(var(--accent) / 0.2);
+    color: rgb(var(--accent));
+  }
+
+  .status-configured {
+    @apply bg-emerald-500/20 text-emerald-400;
+  }
+
+  .status-disabled {
+    @apply bg-gray-500/20 text-gray-400;
+  }
+
+  /* Form Elements */
+  .form-group {
+    @apply space-y-2;
+  }
+
+  .form-label {
+    @apply block text-sm text-gray-300;
+  }
+
+  .input-field {
+    @apply bg-black/20 border border-white/5 rounded text-white w-full px-3 py-2
+           focus:outline-none focus:ring-2 focus:border-transparent;
+    --tw-ring-color: rgb(var(--primary) / 0.5);
+  }
+
+  /* Code/Pre blocks */
+  .code-block {
+    @apply bg-black/20 rounded-lg p-4 overflow-x-auto font-mono text-sm text-gray-300;
+  }
+
+  /* Loading Spinner */
+  .loading-spinner {
+    @apply w-8 h-8 border-4 border-t-transparent rounded-full animate-spin;
+    border-color: rgb(var(--primary));
+    border-top-color: transparent;
+  }
+
+  /* Layout Components */
+  .page-container {
+    @apply min-h-screen flex flex-col bg-transparent;
+  }
+
+  .main-content {
+    @apply flex-grow container mx-auto px-4 pb-16 pt-4;
+  }
+
+  /* Navigation */
+  .nav-container {
+    @apply bg-black/20 backdrop-blur-sm border-b border-white/5;
+  }
+
+  .nav-content {
+    @apply max-w-7xl mx-auto px-4 h-16 flex items-center justify-between;
+  }
+
+  /* Grid Layouts */
+  .grid-2-cols {
+    @apply grid grid-cols-2 gap-4;
+  }
+
+  .grid-3-cols {
+    @apply grid grid-cols-3 gap-4;
+  }
+
+  /* Spacing */
+  .section-spacing {
+    @apply space-y-6;
+  }
+
+  .item-spacing {
+    @apply space-y-4;
+  }
+
+  /* Special Accents */
+  .theme-glow {
+    text-shadow: 0 0 10px rgb(var(--primary) / 0.5);
+  }
+  
+  .accent-glow {
+    text-shadow: 0 0 10px rgb(var(--accent) / 0.5);
+  }
+  
+  .border-theme {
+    border-color: rgb(var(--primary) / 0.3);
+  }
+  
+  .border-accent {
+    border-color: rgb(var(--accent) / 0.3);
+  }
+  
+  .text-theme {
+    color: rgb(var(--primary));
+  }
+  
+  .text-theme-accent {
+    color: rgb(var(--accent));
+  }
+}
+
+/* Ensure proper z-index layering */
+.backdrop {
+  @apply -z-50;
+}
+
+nav {
+  @apply z-30;
+}
+
+footer {
+  @apply z-20;
+}
+
+main {
+  @apply z-10;
+}
+
+/* Dropdown menus should always be above other content */
+.dropdown-menu, 
+[role="menu"], 
+.group:hover > div[class*="absolute"],
+div.absolute.right-0,
+.group:hover > div.absolute {
+  @apply z-[100];
+}
+
+/* Dashboard and management components */
+.dark-panel, 
+.section-spacing, 
+.data-table {
+  @apply z-10;
+}
+
+/* Footer */
+footer {
+  @apply bg-black/20 backdrop-blur-sm border-t border-white/5;
 }

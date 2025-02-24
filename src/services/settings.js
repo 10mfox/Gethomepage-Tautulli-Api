@@ -26,14 +26,6 @@ const defaultSettings = {
         {
           id: 'title',
           template: '${grandparent_title} - S${parent_media_index}E${media_index} - ${title}'
-        },
-        {
-          id: 'details',
-          template: '${content_rating} - ${video_resolution}'
-        },
-        {
-          id: 'added',
-          template: 'Added ${added_at_relative}'
         }
       ]
     },
@@ -42,17 +34,13 @@ const defaultSettings = {
         {
           id: 'title',
           template: '${title} (${year})'
-        },
-        {
-          id: 'details',
-          template: '${content_rating} - ${video_resolution}'
-        },
-        {
-          id: 'added',
-          template: 'Added ${added_at_relative}'
         }
       ]
     }
+  },
+  env: {
+    TAUTULLI_BASE_URL: '',
+    TAUTULLI_API_KEY: ''
   }
 };
 
@@ -61,10 +49,13 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Helper function to validate settings
 function validateSettings(settings) {
-  const requiredKeys = ['userFormats', 'sections', 'mediaFormats'];
+  const requiredKeys = ['userFormats', 'sections', 'mediaFormats', 'env'];
   return requiredKeys.every(key => key in settings) &&
          Array.isArray(settings.sections.shows) &&
-         Array.isArray(settings.sections.movies);
+         Array.isArray(settings.sections.movies) &&
+         typeof settings.env === 'object' &&
+         'TAUTULLI_BASE_URL' in settings.env &&
+         'TAUTULLI_API_KEY' in settings.env;
 }
 
 async function retryOperation(operation, retries = MAX_RETRIES) {
@@ -101,6 +92,12 @@ async function initSettings() {
         logger.log('Invalid settings detected, restoring defaults');
         await saveSettings(defaultSettings);
       }
+
+      // Update environment variables from settings
+      if (currentSettings.env) {
+        process.env.TAUTULLI_BASE_URL = currentSettings.env.TAUTULLI_BASE_URL || '';
+        process.env.TAUTULLI_API_KEY = currentSettings.env.TAUTULLI_API_KEY || '';
+      }
     } catch (error) {
       // File doesn't exist or can't be accessed, create with defaults
       logger.log('Creating default settings file...');
@@ -125,6 +122,10 @@ async function getSettings() {
         mediaFormats: {
           ...defaultSettings.mediaFormats,
           ...settings.mediaFormats
+        },
+        env: {
+          ...defaultSettings.env,
+          ...settings.env
         }
       };
 
@@ -160,6 +161,12 @@ async function saveSettings(settings) {
 
       // Rename temporary file to actual file (atomic operation)
       await fs.rename(tempFile, CONFIG_FILE);
+
+      // Update environment variables
+      if (settings.env) {
+        process.env.TAUTULLI_BASE_URL = settings.env.TAUTULLI_BASE_URL || '';
+        process.env.TAUTULLI_API_KEY = settings.env.TAUTULLI_API_KEY || '';
+      }
 
       return settings;
     } catch (error) {

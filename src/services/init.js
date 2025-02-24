@@ -9,7 +9,7 @@ const UPDATE_INTERVAL = 60000;
 // Pre-configured axios instance with defaults
 const api = axios.create({
   timeout: 10000,
-  headers: { 'Accept-Encoding': 'gzip' } // Enable compression
+  headers: { 'Accept-Encoding': 'gzip' }
 });
 
 // Reuse promises for concurrent requests
@@ -28,20 +28,45 @@ async function fetchWithCache(key, fetchFn) {
   return currentFetchPromises[key];
 }
 
-async function fetchLibraryData() {
-  return fetchWithCache('libraries', async () => {
-    const response = await api.get(`${process.env.TAUTULLI_BASE_URL}/api/v2`, {
-      params: {
-        apikey: process.env.TAUTULLI_API_KEY,
-        cmd: 'get_libraries_table'
-      }
-    });
+async function makeRequest(endpoint, params) {
+  if (!process.env.TAUTULLI_BASE_URL || !process.env.TAUTULLI_API_KEY) {
+    log(`${colors.yellow}⚠${colors.reset} No Tautulli configuration found, using empty data`);
+    return null;
+  }
 
-    if (!response.data?.response?.data?.data) {
-      throw new Error('Invalid library data format');
+  let retries = 0;
+  while (retries < MAX_RETRIES) {
+    try {
+      const response = await api.get(`${process.env.TAUTULLI_BASE_URL}/api/v2`, {
+        params: {
+          apikey: process.env.TAUTULLI_API_KEY,
+          cmd: endpoint,
+          ...params
+        }
+      });
+
+      return response.data;
+    } catch (error) {
+      retries++;
+      if (retries === MAX_RETRIES) {
+        throw error;
+      }
+      log(`${colors.yellow}⚠${colors.reset} Request failed, retrying (${retries}/${MAX_RETRIES})`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+    }
+  }
+}
+
+async function fetchLibraryData() {
+  try {
+    const data = await makeRequest('get_libraries_table');
+    
+    if (!data?.response?.data?.data) {
+      log(`${colors.yellow}⚠${colors.reset} Invalid library data format received`);
+      return [];
     }
 
-    return response.data.response.data.data
+    return data.response.data.data
       .map(library => ({
         section_name: library.section_name,
         section_type: library.section_type,
@@ -53,59 +78,69 @@ async function fetchLibraryData() {
         } : {})
       }))
       .sort((a, b) => a.section_id - b.section_id);
-  });
+  } catch (error) {
+    const errorMessage = error.response?.data?.response?.message || error.message;
+    logError('Library Data Fetch', { message: errorMessage });
+    return [];
+  }
 }
 
 async function fetchUserData() {
-  return fetchWithCache('users', async () => {
+  try {
     const [activityResponse, usersResponse] = await Promise.all([
-      api.get(`${process.env.TAUTULLI_BASE_URL}/api/v2`, {
-        params: {
-          apikey: process.env.TAUTULLI_API_KEY,
-          cmd: 'get_activity'
-        }
-      }),
-      api.get(`${process.env.TAUTULLI_BASE_URL}/api/v2`, {
-        params: {
-          apikey: process.env.TAUTULLI_API_KEY,
-          cmd: 'get_users_table'
-        }
-      })
+      makeRequest('get_activity'),
+      makeRequest('get_users_table')
     ]);
 
     return {
-      activity: activityResponse.data.response.data,
-      users: usersResponse.data.response.data
+      activity: activityResponse?.response?.data || { sessions: [] },
+      users: usersResponse?.response?.data || { data: [] }
     };
-  });
+  } catch (error) {
+    const errorMessage = error.response?.data?.response?.message || error.message;
+    logError('User Data Fetch', { message: errorMessage });
+    return { activity: { sessions: [] }, users: { data: [] } };
+  }
 }
 
 async function fetchRecentMedia(sectionId, mediaType) {
-  return fetchWithCache(`media-${sectionId}`, async () => {
-    const response = await api.get(`${process.env.TAUTULLI_BASE_URL}/api/v2`, {
-      params: {
-        apikey: process.env.TAUTULLI_API_KEY,
-        cmd: 'get_recently_added',
-        section_id: sectionId,
-        count: 15
-      }
+  try {
+    const response = await makeRequest('get_recently_added', {
+      section_id: sectionId,
+      count: 15
     });
 
     return {
       type: mediaType,
       sectionId,
-      data: response.data.response.data.recently_added || []
+      data: response?.response?.data?.recently_added || []
     };
-  });
+  } catch (error) {
+    const errorMessage = error.response?.data?.response?.message || error.message;
+    logError(`Recent Media Fetch - Section ${sectionId}`, { message: errorMessage });
+    return {
+      type: mediaType,
+      sectionId,
+      data: []
+    };
+  }
 }
 
 async function updateCacheItem(key, fetchFunction) {
   try {
     const data = await fetchFunction();
-    return cache.set(key, key === 'libraries' ? 
+    const success = cache.set(key, key === 'libraries' ? 
       { response: { result: 'success', data } } : 
       data
     );
+    
+    if (success) {
+      log(`${colors.brightGreen}✓${colors.reset} Cache updated successfully for ${key}`);
+    } else {
+      log(`${colors.yellow}⚠${colors.reset} Failed to update cache for ${key}`);
+    }
+    
+    return success;
   } catch (error) {
     logError(`Cache Update - ${key}`, error);
     return false;
@@ -122,6 +157,16 @@ async function initializeCache() {
 
   try {
     updateInProgress = true;
+
+    // Initialize with empty data if no configuration
+    if (!process.env.TAUTULLI_BASE_URL || !process.env.TAUTULLI_API_KEY) {
+      cache.set('libraries', { response: { result: 'success', data: [] } });
+      cache.set('users', { activity: { sessions: [] }, users: { data: [] } });
+      cache.set('recent_media', []);
+      log(`${colors.yellow}⚠${colors.reset} No Tautulli configuration found, using empty cache`);
+      return true;
+    }
+
     const updates = {
       libraries: await updateCacheItem('libraries', fetchLibraryData),
       users: await updateCacheItem('users', fetchUserData)

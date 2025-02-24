@@ -3,7 +3,7 @@ import { Github } from 'lucide-react';
 
 const Footer = () => {
   return (
-    <footer className="fixed bottom-0 left-0 right-0 p-2 bg-gray-800 border-t border-gray-700 text-center z-50">
+    <footer className="fixed bottom-0 left-0 right-0 p-2 bg-black/20 backdrop-blur-sm border-t border-white/5 text-center z-10">
       <div className="container mx-auto flex items-center justify-between">
         <p className="text-sm text-gray-400">
           Created by{' '}
@@ -11,7 +11,8 @@ const Footer = () => {
             href="https://github.com/10mfox"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-white hover:text-blue-400 transition-colors duration-200"
+            className="hover:text-white transition-colors duration-200"
+            style={{ color: `rgb(var(--accent))` }}
           >
             10mfox
           </a>

@@ -21,18 +21,18 @@ const generateUserMappings = (length, formatFields) => {
 
 const generateMediaMappings = (length, hasAdditionalField = false) => {
   return Array.from({ length }, (_, index) => {
-    const baseMapping = `            - field:
-                response:
-                  data:
-                    ${index}: field`;
-    
-    const additionalFieldMapping = hasAdditionalField ? `
-              additionalField:
-                field:
+    const baseMapping = `              - field:
                   response:
                     data:
-                      ${index}: additionalfield
-                color: theme` : '';
+                      ${index}: field`;
+    
+    const additionalFieldMapping = hasAdditionalField ? `
+                additionalField:
+                  field:
+                    response:
+                      data:
+                        ${index}: additionalfield
+                  color: theme` : '';
     
     return baseMapping + additionalFieldMapping;
   }).join('\n');
@@ -58,113 +58,195 @@ const generateActivityYaml = (formatFields, mappingLengths, localIp) => {
 ${mappings}`;
 };
 
-const generateMediaCountSection = (sectionId, sectionName, index, isShow, localIp, useFormattedNumbers) => {
-  const valueParam = useFormattedNumbers ? '_formatted' : '';
-  const baseMapping = `             - field:
-                 response:
-                   sections:
-                     ${index}: count${valueParam}
-               format: numbers
-               label: ${sectionName}`;
-
-  const showMappings = isShow ? `
-             - field:
-                 response:
-                   sections:
-                     ${index}: parent_count${valueParam}
-               format: numbers
-               label: Seasons
-             - field:
-                 response:
-                   sections:
-                     ${index}: child_count${valueParam}
-               format: numbers
-               label: Episodes` : '';
-
-  return `    - ${sectionName}:
-         widgets:
-           - type: customapi
-             url: http://${localIp}:3010/api/libraries
-             method: GET
-             display: block
-             mappings:
-${baseMapping}${showMappings}`;
-};
-
-const generateRecentMediaYaml = (sections, formatFields, libraryNames, mappingLengths, localIp, combineSections = false) => {
+const generateRecentMediaYaml = (sections, formatFields, libraryNames, mappingLengths, localIp, combineSections = false, showCount = false, useFormattedNumbers = true) => {
   const yaml = [];
+  const valueParam = useFormattedNumbers ? '_formatted' : '';
   
-  if (combineSections) {
-    if (sections.movies.length > 0) {
-      const mappings = generateMediaMappings(mappingLengths.movies, true);
-      yaml.push(`    - Movies:
+  if (sections.movies.length > 0 || sections.shows.length > 0) {
+    if (combineSections) {
+      // Combined movies section
+      if (sections.movies.length > 0) {
+        const movieSectionIds = sections.movies.join(',');
+        const hasAdditionalField = sections.movies.some(id => 
+          formatFields.movies[id]?.fields.some(f => f.id === 'additionalfield')
+        );
+        const mappings = generateMediaMappings(mappingLengths.movies, hasAdditionalField);
+        
+        let movieYaml = `    - Movies:
         icon: mdi-filmstrip
         id: list
-        widget:
-          type: customapi
-          url: http://${localIp}:3010/api/recent/movies?count=${mappingLengths.movies}
-          method: GET
-          display: list
-          mappings:
-${mappings}`);
-    }
+        widgets:
+          - type: customapi
+            url: http://${localIp}:3010/api/media/recent?type=movies&section=${movieSectionIds}
+            method: GET
+            display: list
+            mappings:
+${mappings}`;
 
-    if (sections.shows.length > 0) {
-      const mappings = generateMediaMappings(mappingLengths.shows, true);
-      yaml.push(`    - TV Shows:
+        if (showCount) {
+          movieYaml += `
+          - type: customapi
+            url: http://${localIp}:3010/api/media/recent
+            method: GET
+            display: block
+            mappings:
+            - field:
+                response:
+                  libraries:
+                    totals:
+                      movies: total_items${valueParam}
+              format: numbers
+              label: Movies`;
+        }
+        
+        yaml.push(movieYaml);
+      }
+
+      // Combined shows section
+      if (sections.shows.length > 0) {
+        const showSectionIds = sections.shows.join(',');
+        const hasAdditionalField = sections.shows.some(id => 
+          formatFields.shows[id]?.fields.some(f => f.id === 'additionalfield')
+        );
+        const mappings = generateMediaMappings(mappingLengths.shows, hasAdditionalField);
+        
+        let showYaml = `    - TV Shows:
         icon: mdi-television-classic
         id: list
-        widget:
-          type: customapi
-          url: http://${localIp}:3010/api/recent/shows?count=${mappingLengths.shows}
-          method: GET
-          display: list
-          mappings:
-${mappings}`);
-    }
-  } else {
-    if (sections.movies.length > 0) {
-      sections.movies.forEach(sectionId => {
-        const sectionFields = formatFields.movies[sectionId]?.fields || [];
-        const hasField = sectionFields.some(f => f.id === 'field');
-        const sectionName = libraryNames[sectionId] || `Movies Section ${sectionId}`;
+        widgets:
+          - type: customapi
+            url: http://${localIp}:3010/api/media/recent?type=shows&section=${showSectionIds}
+            method: GET
+            display: list
+            mappings:
+${mappings}`;
+
+        if (showCount) {
+          showYaml += `
+          - type: customapi
+            url: http://${localIp}:3010/api/media/recent
+            method: GET
+            display: block
+            mappings:
+            - field:
+                response:
+                  libraries:
+                    totals:
+                      shows: total_items${valueParam}
+              format: numbers
+              label: Shows
+            - field:
+                response:
+                  libraries:
+                    totals:
+                      shows: total_seasons${valueParam}
+              format: numbers
+              label: Seasons
+            - field:
+                response:
+                  libraries:
+                    totals:
+                      shows: total_episodes${valueParam}
+              format: numbers
+              label: Episodes`;
+        }
         
-        if (hasField) {
-          const mappings = generateMediaMappings(mappingLengths.movies, sectionFields.some(f => f.id === 'additionalfield'));
-          yaml.push(`    - ${sectionName}:
+        yaml.push(showYaml);
+      }
+    } else {
+      let sectionIndex = 0;
+      // Individual section for each library section
+      if (sections.movies.length > 0) {
+        sections.movies.forEach(sectionId => {
+          const sectionFields = formatFields.movies[sectionId]?.fields || [];
+          const hasAdditionalField = sectionFields.some(f => f.id === 'additionalfield');
+          const sectionName = libraryNames[sectionId] || `Movies Section ${sectionId}`;
+          const mappings = generateMediaMappings(mappingLengths.movies, hasAdditionalField);
+
+          let sectionYaml = `    - ${sectionName}:
         icon: mdi-filmstrip
         id: list
-        widget:
-          type: customapi
-          url: http://${localIp}:3010/api/recent/movies/${sectionId}?count=${mappingLengths.movies}
-          method: GET
-          display: list
-          mappings:
-${mappings}`);
-        }
-      });
-    }
+        widgets:
+          - type: customapi
+            url: http://${localIp}:3010/api/media/recent?type=movies&section=${sectionId}
+            method: GET
+            display: list
+            mappings:
+${mappings}`;
 
-    if (sections.shows.length > 0) {
-      sections.shows.forEach(sectionId => {
-        const sectionFields = formatFields.shows[sectionId]?.fields || [];
-        const hasField = sectionFields.some(f => f.id === 'field');
-        const sectionName = libraryNames[sectionId] || `Shows Section ${sectionId}`;
-        
-        if (hasField) {
-          const mappings = generateMediaMappings(mappingLengths.shows, sectionFields.some(f => f.id === 'additionalfield'));
-          yaml.push(`    - ${sectionName}:
+          if (showCount) {
+            sectionYaml += `
+          - type: customapi
+            url: http://${localIp}:3010/api/media/recent
+            method: GET
+            display: block
+            mappings:
+            - field:
+                response:
+                  libraries:
+                    sections:
+                      ${sectionIndex}: count${valueParam}
+              format: numbers
+              label: Movies`;
+          }
+
+          yaml.push(sectionYaml);
+          sectionIndex++;
+        });
+      }
+
+      if (sections.shows.length > 0) {
+        sections.shows.forEach(sectionId => {
+          const sectionFields = formatFields.shows[sectionId]?.fields || [];
+          const hasAdditionalField = sectionFields.some(f => f.id === 'additionalfield');
+          const sectionName = libraryNames[sectionId] || `Shows Section ${sectionId}`;
+          const mappings = generateMediaMappings(mappingLengths.shows, hasAdditionalField);
+
+          let sectionYaml = `    - ${sectionName}:
         icon: mdi-television-classic
         id: list
-        widget:
-          type: customapi
-          url: http://${localIp}:3010/api/recent/shows/${sectionId}?count=${mappingLengths.shows}
-          method: GET
-          display: list
-          mappings:
-${mappings}`);
-        }
-      });
+        widgets:
+          - type: customapi
+            url: http://${localIp}:3010/api/media/recent?type=shows&section=${sectionId}
+            method: GET
+            display: list
+            mappings:
+${mappings}`;
+
+          if (showCount) {
+            sectionYaml += `
+          - type: customapi
+            url: http://${localIp}:3010/api/media/recent
+            method: GET
+            display: block
+            mappings:
+            - field:
+                response:
+                  libraries:
+                    sections:
+                      ${sectionIndex}: count${valueParam}
+              format: numbers
+              label: Shows
+            - field:
+                response:
+                  libraries:
+                    sections:
+                      ${sectionIndex}: parent_count${valueParam}
+              format: numbers
+              label: Seasons
+            - field:
+                response:
+                  libraries:
+                    sections:
+                      ${sectionIndex}: child_count${valueParam}
+              format: numbers
+              label: Episodes`;
+          }
+
+          yaml.push(sectionYaml);
+          sectionIndex++;
+        });
+      }
     }
   }
 
@@ -172,6 +254,8 @@ ${mappings}`);
 };
 
 const generateMediaCountYaml = (sections, libraryNames, localIp, showIndividualCounts, useFormattedNumbers) => {
+  const valueParam = useFormattedNumbers ? '_formatted' : '';
+  
   if (showIndividualCounts) {
     const yaml = [];
 
@@ -179,7 +263,20 @@ const generateMediaCountYaml = (sections, libraryNames, localIp, showIndividualC
     if (sections.movies.length > 0) {
       sections.movies.forEach((sectionId, index) => {
         const sectionName = libraryNames[sectionId] || `Movies Section ${sectionId}`;
-        yaml.push(generateMediaCountSection(sectionId, sectionName, index, false, localIp, useFormattedNumbers));
+        yaml.push(`    - ${sectionName}:
+         widgets:
+           - type: customapi
+             url: http://${localIp}:3010/api/media/recent
+             method: GET
+             display: block
+             mappings:
+             - field:
+                 response:
+                   libraries:
+                     sections:
+                       ${index}: count${valueParam}
+               format: numbers
+               label: Movies`);
       });
     }
 
@@ -188,52 +285,81 @@ const generateMediaCountYaml = (sections, libraryNames, localIp, showIndividualC
       sections.shows.forEach((sectionId, index) => {
         const sectionName = libraryNames[sectionId] || `Shows Section ${sectionId}`;
         const showIndex = sections.movies.length + index;
-        yaml.push(generateMediaCountSection(sectionId, sectionName, showIndex, true, localIp, useFormattedNumbers));
-      });
-    }
-
-    return `- Media Count:\n${yaml.join('\n\n')}`;
-  } else {
-    const valueParam = useFormattedNumbers ? '_formatted' : '';
-
-    return `- Media Count:
-    - Movies:
+        yaml.push(`    - ${sectionName}:
          widgets:
            - type: customapi
-             url: http://${localIp}:3010/api/libraries
+             url: http://${localIp}:3010/api/media/recent
              method: GET
              display: block
              mappings:
              - field:
                  response:
-                   totals:
-                     movies: total_items${valueParam}
+                   libraries:
+                     sections:
+                       ${showIndex}: count${valueParam}
+               format: numbers
+               label: Shows
+             - field:
+                 response:
+                   libraries:
+                     sections:
+                       ${showIndex}: parent_count${valueParam}
+               format: numbers
+               label: Seasons
+             - field:
+                 response:
+                   libraries:
+                     sections:
+                       ${showIndex}: child_count${valueParam}
+               format: numbers
+               label: Episodes`);
+      });
+    }
+
+    return `- Media Count:\n${yaml.join('\n\n')}`;
+  } else {
+    return `- Media Count:
+    - Movies:
+         widgets:
+           - type: customapi
+             url: http://${localIp}:3010/api/media/recent
+             method: GET
+             display: block
+             mappings:
+             - field:
+                 response:
+                   libraries:
+                     totals:
+                       movies: total_items${valueParam}
                format: numbers
                label: Movies
 
     - Shows:
          widgets:
            - type: customapi
-             url: http://${localIp}:3010/api/libraries
+             url: http://${localIp}:3010/api/media/recent
              method: GET
              display: block
              mappings:
              - field:
                  response:
-                   totals:
-                     shows: total_items${valueParam}
+                   libraries:
+                     totals:
+                       shows: total_items${valueParam}
                format: numbers
                label: Shows
              - field:
                  response:
-                   totals:
-                     shows: total_seasons${valueParam}
+                   libraries:
+                     totals:
+                       shows: total_seasons${valueParam}
                format: numbers
                label: Seasons
              - field:
                  response:
-                   totals:
-                     shows: total_episodes${valueParam}
+                   libraries:
+                     totals:
+                       shows: total_episodes${valueParam}
                format: numbers
                label: Episodes`;
   }

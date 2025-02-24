@@ -1,0 +1,88 @@
+Project Folder
+│   Dockerfile
+│   logger.js
+│   package.json
+│   Project Structure.txt
+│   README.md
+│   server.js
+│
+├───config
+│       defaults.json
+│
+├───frontend
+│   │   jsconfig.json
+│   │   package.json
+│   │   postcss.config.js
+│   │   tailwind.config.js
+│   │
+│   ├───public
+│   │       backdrop.jpg
+│   │       favicon.ico
+│   │       index.html
+│   │       old-backdrop.jpg
+│   │
+│   └───src
+│       │   App.js
+│       │   index.css
+│       │   index.js
+│       │
+│       ├───components
+│       │   │   Dashboard.js
+│       │   │   Footer.js
+│       │   │   FormatManager.js
+│       │   │   Nav.js
+│       │   │   StaticBackdrop.js
+│       │   │   ThemeSwitcher.js
+│       │   │
+│       │   ├───dashboards
+│       │   │       LibraryView.js
+│       │   │       RecentMediaView.js
+│       │   │       UserView.js
+│       │   │
+│       │   ├───managers
+│       │   │   │   EndpointsView.js
+│       │   │   │   HomepageView.js
+│       │   │   │   MediaFormatView.js
+│       │   │   │   SectionManager.js
+│       │   │   │   TautulliSettings.js
+│       │   │   │   UserFormatView.js
+│       │   │   │
+│       │   │   └───utils
+│       │   │           homepageConfig.js
+│       │   │
+│       │   └───ui
+│       │           alert.jsx
+│       │
+│       ├───context
+│       │       ThemeContext.js
+│       │
+│       ├───hooks
+│       │       useBackgroundRefresh.js
+│       │
+│       ├───services
+│       │       tautulli.js
+│       │
+│       └───utils
+│               index.js
+│
+├───homepage docs
+│       css for homepage.css
+│       example-services.yaml
+│
+├───screenshots
+│       Activity.png
+│       Count.png
+│       Movies.png
+│       Recently.png
+│       Shows.png
+│
+└───src
+    ├───api
+    │       media.js
+    │       users.js
+    │
+    └───services
+            cache.js
+            init.js
+            settings.js
+            tautulli.js

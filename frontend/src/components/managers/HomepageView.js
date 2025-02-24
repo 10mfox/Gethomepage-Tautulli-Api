@@ -20,14 +20,16 @@ const HomepageView = () => {
   const [baseUrl, setBaseUrl] = useState('');
   const [localIp, setLocalIp] = useState('');
   const [port, setPort] = useState('');
+  const [userFormatFields, setUserFormatFields] = useState([]);
   const [mappingLengths, setMappingLengths] = useState({
-    users: 1,
-    movies: 1,
-    shows: 1
+    users: 15,
+    movies: 15,
+    shows: 15
   });
   const [showIndividualCounts, setShowIndividualCounts] = useState(true);
   const [useFormattedNumbers, setUseFormattedNumbers] = useState(true);
   const [combineSections, setCombineSections] = useState(false);
+  const [showCount, setShowCount] = useState(false);
 
   useEffect(() => {
     fetchSections();
@@ -44,33 +46,46 @@ const HomepageView = () => {
 
   const fetchSections = async () => {
     try {
-      const [settingsResponse, configResponse, userResponse, librariesResponse] = await Promise.all([
+      setLoading(true);
+      const [settingsResponse, mediaResponse, configResponse, userFormatResponse] = await Promise.all([
         fetch('/api/media/settings'),
+        fetch('/api/media/recent'),
         fetch('/api/config'),
-        fetch('/api/users/format-settings'),
-        fetch('/api/libraries')
+        fetch('/api/users/format-settings')
       ]);
       
       const settingsData = await settingsResponse.json();
+      const mediaData = await mediaResponse.json();
       const configData = await configResponse.json();
-      const userFormatData = await userResponse.json();
-      const librariesData = await librariesResponse.json();
+      const userFormatData = await userFormatResponse.json();
       
       // Get library names and build sections object
       const names = {};
       const processedSections = { shows: [], movies: [] };
 
-      librariesData.response.sections.forEach(library => {
-        names[library.section_id] = library.section_name;
-        
-        if (library.configured) {
-          if (library.section_type === 'movie') {
-            processedSections.movies.push(library.section_id);
-          } else if (library.section_type === 'show') {
-            processedSections.shows.push(library.section_id);
+      if (mediaData?.response?.libraries?.sections) {
+        mediaData.response.libraries.sections.forEach(library => {
+          names[library.section_id] = library.section_name;
+          
+          if (library.configured) {
+            if (library.section_type === 'movie') {
+              processedSections.movies.push(library.section_id);
+            } else if (library.section_type === 'show') {
+              processedSections.shows.push(library.section_id);
+            }
           }
+        });
+
+        // If we got library data but no processed sections, use settings sections
+        if (!processedSections.movies.length && !processedSections.shows.length) {
+          processedSections.movies = settingsData.sections?.movies || [];
+          processedSections.shows = settingsData.sections?.shows || [];
         }
-      });
+      } else {
+        // Fallback to settings sections
+        processedSections.movies = settingsData.sections?.movies || [];
+        processedSections.shows = settingsData.sections?.shows || [];
+      }
       
       setSections(processedSections);
       setLibraryNames(names);
@@ -79,6 +94,7 @@ const HomepageView = () => {
         movies: settingsData.formats?.movies || {},
         shows: settingsData.formats?.shows || {}
       });
+      setUserFormatFields(userFormatData.fields || []);
       setBaseUrl(configData.baseUrl || '');
       setLocalIp(configData.localIp || '');
       setPort(configData.port || '3010');
@@ -107,12 +123,12 @@ const HomepageView = () => {
   };
 
   const ConfigSection = ({ title, yaml, section }) => (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium text-white">{title}</h3>
+    <div className="dark-panel">
+      <div className="table-header flex items-center justify-between">
+        <h3 className="header-text">{title}</h3>
         <button
           onClick={() => copyToClipboard(yaml, section)}
-          className="flex items-center gap-2 px-3 py-1 text-sm bg-gray-700 text-white rounded hover:bg-gray-600 transition-colors"
+          className="btn-primary"
         >
           {copiedSection === section ? (
             <>
@@ -127,27 +143,42 @@ const HomepageView = () => {
           )}
         </button>
       </div>
-      <pre className="p-4 bg-gray-800 rounded-lg overflow-x-auto">
-        <code className="text-sm text-gray-300 whitespace-pre">{yaml}</code>
-      </pre>
+      <div className="p-4">
+        <pre className="code-block">
+          <code className="text-gray-300 whitespace-pre">{yaml}</code>
+        </pre>
+      </div>
     </div>
   );
 
   if (loading) {
-    return <div className="text-center text-gray-400">Loading configuration...</div>;
+    return (
+      <div className="flex justify-center items-center p-8">
+        <div className="loading-spinner" />
+      </div>
+    );
   }
 
-  const hasNoSections = !Object.values(sections).some(list => list.length > 0);
+  const hasNoSections = sections &&
+    Object.values(sections).every(list => !Array.isArray(list) || list.length === 0);
 
-  const activityConfig = generateActivityYaml(formatFields, mappingLengths, localIp);
+  const activityConfig = generateActivityYaml(
+    { users: userFormatFields }, 
+    mappingLengths, 
+    localIp
+  );
+  
   const recentMediaConfig = generateRecentMediaYaml(
     sections, 
     formatFields, 
     libraryNames, 
     mappingLengths, 
     localIp,
-    combineSections
+    combineSections,
+    showCount,
+    useFormattedNumbers
   );
+  
   const mediaCountConfig = generateMediaCountYaml(
     sections, 
     libraryNames, 
@@ -157,10 +188,12 @@ const HomepageView = () => {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-4">
-        <h3 className="text-sm font-medium text-gray-300 mb-4">Display Settings</h3>
-        <div className="space-y-4">
+    <div className="section-spacing">
+      <div className="dark-panel">
+        <div className="table-header">
+          <h3 className="header-text">Display Settings</h3>
+        </div>
+        <div className="p-4 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Layers className="h-4 w-4 text-gray-400" />
@@ -168,24 +201,40 @@ const HomepageView = () => {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => setCombineSections(false)}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
-                  !combineSections 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
-                }`}
+                onClick={() => {
+                  setCombineSections(false);
+                  setShowCount(false);
+                }}
+                className={!combineSections && !showCount ? 'btn-primary' : 'btn-secondary'}
               >
                 Split
               </button>
               <button
-                onClick={() => setCombineSections(true)}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
-                  combineSections 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
-                }`}
+                onClick={() => {
+                  setCombineSections(false);
+                  setShowCount(true);
+                }}
+                className={!combineSections && showCount ? 'btn-primary' : 'btn-secondary'}
+              >
+                Split with Count
+              </button>
+              <button
+                onClick={() => {
+                  setCombineSections(true);
+                  setShowCount(false);
+                }}
+                className={combineSections && !showCount ? 'btn-primary' : 'btn-secondary'}
               >
                 Combined
+              </button>
+              <button
+                onClick={() => {
+                  setCombineSections(true);
+                  setShowCount(true);
+                }}
+                className={combineSections && showCount ? 'btn-primary' : 'btn-secondary'}
+              >
+                Combined with Count
               </button>
             </div>
           </div>
@@ -198,21 +247,13 @@ const HomepageView = () => {
             <div className="flex gap-2">
               <button
                 onClick={() => setShowIndividualCounts(true)}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
-                  showIndividualCounts 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
-                }`}
+                className={showIndividualCounts ? 'btn-primary' : 'btn-secondary'}
               >
                 Individual
               </button>
               <button
                 onClick={() => setShowIndividualCounts(false)}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
-                  !showIndividualCounts 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
-                }`}
+                className={!showIndividualCounts ? 'btn-primary' : 'btn-secondary'}
               >
                 Totals Only
               </button>
@@ -227,21 +268,13 @@ const HomepageView = () => {
             <div className="flex gap-2">
               <button
                 onClick={() => setUseFormattedNumbers(true)}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
-                  useFormattedNumbers 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
-                }`}
+                className={useFormattedNumbers ? 'btn-primary' : 'btn-secondary'}
               >
                 Formatted
               </button>
               <button
                 onClick={() => setUseFormattedNumbers(false)}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
-                  !useFormattedNumbers 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
-                }`}
+                className={!useFormattedNumbers ? 'btn-primary' : 'btn-secondary'}
               >
                 Raw
               </button>
@@ -250,59 +283,65 @@ const HomepageView = () => {
         </div>
       </div>
 
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-        <h3 className="text-sm font-medium text-gray-300 mb-4">Mapping Length Settings</h3>
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Users</label>
-            <input
-              type="number"
-              min="1"
-              max="25"
-              value={mappingLengths.users}
-              onChange={(e) => handleLengthChange('users', e.target.value)}
-              className="w-full px-3 py-1 bg-gray-700 border border-gray-600 rounded text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Movies</label>
-            <input
-              type="number"
-              min="1"
-              max="15"
-              value={mappingLengths.movies}
-              onChange={(e) => handleLengthChange('movies', e.target.value)}
-              className="w-full px-3 py-1 bg-gray-700 border border-gray-600 rounded text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Shows</label>
-            <input
-              type="number"
-              min="1"
-              max="15"
-              value={mappingLengths.shows}
-              onChange={(e) => handleLengthChange('shows', e.target.value)}
-              className="w-full px-3 py-1 bg-gray-700 border border-gray-600 rounded text-white"
-            />
+      <div className="dark-panel">
+        <div className="table-header">
+          <h3 className="header-text">Mapping Length Settings</h3>
+        </div>
+        <div className="p-4">
+          <div className="grid-3-cols">
+            <div>
+              <label className="form-label mb-1">Users</label>
+              <input
+                type="number"
+                min="1"
+                max="25"
+                value={mappingLengths.users}
+                onChange={(e) => handleLengthChange('users', e.target.value)}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="form-label mb-1">Movies</label>
+              <input
+                type="number"
+                min="1"
+                max="15"
+                value={mappingLengths.movies}
+                onChange={(e) => handleLengthChange('movies', e.target.value)}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="form-label mb-1">Shows</label>
+              <input
+                type="number"
+                min="1"
+                max="15"
+                value={mappingLengths.shows}
+                onChange={(e) => handleLengthChange('shows', e.target.value)}
+                className="input-field"
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      <Alert className="bg-blue-900/50 border-blue-800">
-        <AlertDescription className="text-blue-100">
+      <Alert className="alert alert-info">
+        <AlertDescription>
           Below are example Homepage configurations based on your current section settings.
           URLs are automatically configured using your Tautulli base URL.
         </AlertDescription>
       </Alert>
 
       {hasNoSections ? (
-        <div className="text-center text-gray-400 p-8 bg-gray-800 rounded-lg">
-          No sections configured. Add sections in the Section Manager tab to see Homepage configuration examples.
+        <div className="dark-panel">
+          <div className="p-8 text-center text-gray-400">
+            No sections configured. Add sections in the Section Manager tab to see Homepage configuration examples.
+          </div>
         </div>
       ) : (
         <>
-          {activityConfig && (
+          {userFormatFields.length > 0 && (
             <ConfigSection 
               title="User Activity Configuration" 
               yaml={activityConfig} 
