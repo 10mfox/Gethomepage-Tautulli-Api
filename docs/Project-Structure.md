@@ -2,12 +2,26 @@ Project Folder
 │   Dockerfile
 │   logger.js
 │   package.json
-│   Project Structure.txt
 │   README.md
 │   server.js
 │
+├───backend
+│   ├───api
+│   │       media.js
+│   │       users.js
+│   │
+│   └───services
+│           cacheService.js
+│           settings.js
+│           tautulli.js
+│
 ├───config
 │       defaults.json
+│
+├───docs
+│       API.md
+│       INSTALLATION.md
+│       Project-Structure.md
 │
 ├───frontend
 │   │   jsconfig.json
@@ -16,10 +30,12 @@ Project Folder
 │   │   tailwind.config.js
 │   │
 │   ├───public
-│   │       backdrop.jpg
-│   │       favicon.ico
-│   │       index.html
-│   │       old-backdrop.jpg
+│   │   │   backdrop.jpg
+│   │   │   favicon.ico
+│   │   │   index.html
+│   │   │
+│   │   └───static
+│   │           poster-placeholder.jpg
 │   │
 │   └───src
 │       │   App.js
@@ -27,31 +43,25 @@ Project Folder
 │       │   index.js
 │       │
 │       ├───components
-│       │   │   Dashboard.js
-│       │   │   Footer.js
 │       │   │   FormatManager.js
-│       │   │   Nav.js
-│       │   │   StaticBackdrop.js
 │       │   │   ThemeSwitcher.js
 │       │   │
-│       │   ├───dashboards
+│       │   ├───dashboard
 │       │   │       LibraryView.js
 │       │   │       RecentMediaView.js
 │       │   │       UserView.js
 │       │   │
+│       │   ├───layout
+│       │   │       Layout.js
+│       │   │
 │       │   ├───managers
-│       │   │   │   EndpointsView.js
-│       │   │   │   HomepageView.js
-│       │   │   │   MediaFormatView.js
-│       │   │   │   SectionManager.js
-│       │   │   │   TautulliSettings.js
-│       │   │   │   UserFormatView.js
-│       │   │   │
-│       │   │   └───utils
-│       │   │           homepageConfig.js
+│       │   │       EndpointsView.js
+│       │   │       HomepageView.js
+│       │   │       SectionManager.js
+│       │   │       UnifiedFormatManager.js
 │       │   │
 │       │   └───ui
-│       │           alert.jsx
+│       │           UIComponents.js
 │       │
 │       ├───context
 │       │       ThemeContext.js
@@ -63,26 +73,15 @@ Project Folder
 │       │       tautulli.js
 │       │
 │       └───utils
-│               index.js
+│               utils.js
 │
 ├───homepage docs
 │       css for homepage.css
 │       example-services.yaml
 │
-├───screenshots
-│       Activity.png
-│       Count.png
-│       Movies.png
-│       Recently.png
-│       Shows.png
-│
-└───src
-    ├───api
-    │       media.js
-    │       users.js
-    │
-    └───services
-            cache.js
-            init.js
-            settings.js
-            tautulli.js
+└───screenshots
+        Activity.png
+        Count.png
+        Movies.png
+        Recently.png
+        Shows.png

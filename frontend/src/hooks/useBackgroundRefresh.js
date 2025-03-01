@@ -1,5 +1,22 @@
+/**
+ * Custom hook for background data fetching with automatic refresh
+ * Provides loading state, error handling, and manual refresh capability
+ * @module hooks/useBackgroundRefresh
+ */
 import { useState, useEffect, useRef, useCallback } from 'react';
 
+/**
+ * Custom hook for fetching data with periodic background refresh
+ * 
+ * @param {Function} fetchFn - Async function to fetch data
+ * @param {number} [initialInterval=60000] - Refresh interval in milliseconds
+ * @returns {Object} Hook state and controls
+ * @returns {*} returns.data - The fetched data
+ * @returns {boolean} returns.loading - Loading state
+ * @returns {string|null} returns.error - Error message if any
+ * @returns {Date|null} returns.lastUpdated - Timestamp of last successful update
+ * @returns {Function} returns.refresh - Function to manually trigger refresh
+ */
 export const useBackgroundRefresh = (fetchFn, initialInterval = 60000) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -9,6 +26,13 @@ export const useBackgroundRefresh = (fetchFn, initialInterval = 60000) => {
   const intervalRef = useRef(null);
   const fetchingRef = useRef(false);
 
+  /**
+   * Check if two data objects are equal
+   * 
+   * @param {*} a - First data object
+   * @param {*} b - Second data object
+   * @returns {boolean} True if equal, false otherwise
+   */
   const isEqual = (a, b) => {
     if (!a || !b) return false;
     try {
@@ -18,6 +42,12 @@ export const useBackgroundRefresh = (fetchFn, initialInterval = 60000) => {
     }
   };
 
+  /**
+   * Fetch data and update state
+   * 
+   * @async
+   * @param {boolean} [force=false] - Force update even if data hasn't changed
+   */
   const fetch = useCallback(async (force = false) => {
     // Prevent concurrent fetches
     if (fetchingRef.current) return;
@@ -43,6 +73,7 @@ export const useBackgroundRefresh = (fetchFn, initialInterval = 60000) => {
     }
   }, [fetchFn]);
 
+  // Set up initial fetch and interval
   useEffect(() => {
     // Initial fetch
     fetch(true);

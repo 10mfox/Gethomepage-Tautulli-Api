@@ -1,16 +1,48 @@
+/**
+ * API Endpoints documentation component
+ * Displays information about available API endpoints with examples
+ * @module components/managers/EndpointsView
+ */
 import React, { useState, useEffect } from 'react';
 import { ChevronRight, Copy, CheckCircle2, ExternalLink, Globe } from 'lucide-react';
-import { Alert, AlertDescription } from '../ui/alert';
+import { Alert, AlertDescription } from '../ui/UIComponents';
 
+/**
+ * Component for displaying and testing API endpoints
+ * 
+ * @returns {JSX.Element} Rendered component
+ */
 const EndpointsView = () => {
+  /**
+   * Application configuration
+   * @type {[Object|null, Function]}
+   */
   const [config, setConfig] = useState(null);
+  
+  /**
+   * Loading state
+   * @type {[boolean, Function]}
+   */
   const [loading, setLoading] = useState(true);
+  
+  /**
+   * URL that was last copied
+   * @type {[string|null, Function]}
+   */
   const [copiedUrl, setCopiedUrl] = useState(null);
 
+  /**
+   * Fetch application configuration
+   */
   useEffect(() => {
     fetchConfig();
   }, []);
 
+  /**
+   * Load configuration data from API
+   * 
+   * @async
+   */
   const fetchConfig = async () => {
     try {
       const response = await fetch('/api/config');
@@ -23,6 +55,12 @@ const EndpointsView = () => {
     }
   };
 
+  /**
+   * Copy URL to clipboard
+   * 
+   * @async
+   * @param {string} url - URL to copy
+   */
   const handleCopy = async (url) => {
     try {
       await navigator.clipboard.writeText(url);
@@ -33,6 +71,11 @@ const EndpointsView = () => {
     }
   };
 
+  /**
+   * Open URL in new tab for testing
+   * 
+   * @param {string} url - URL to test
+   */
   const handleTest = (url) => {
     window.open(url, '_blank');
   };
@@ -49,6 +92,10 @@ const EndpointsView = () => {
   const movieIds = config?.sections?.movies || [];
   const showIds = config?.sections?.shows || [];
 
+  /**
+   * Endpoint group definitions
+   * @type {Array<{title: string, endpoints: Array<{url: string, description: string, examples: Array<string>}>}>}
+   */
   const endpointGroups = [
     {
       title: 'User Activity Endpoints',

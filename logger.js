@@ -1,5 +1,13 @@
-// logger.js
+/**
+ * Logger module for application-wide logging with color support
+ * Provides formatted console output for various log types
+ * @module logger
+ */
 
+/**
+ * ANSI color and style codes for console output
+ * @type {Object.<string, string>}
+ */
 const colors = {
   reset: '\x1b[0m',
   bright: '\x1b[1m',
@@ -32,6 +40,11 @@ const colors = {
   bgCyan: '\x1b[46m'
 };
 
+/**
+ * Gets current timestamp with color formatting
+ * 
+ * @returns {string} Colored timestamp string
+ */
 function getColoredTimestamp() {
   const timestamp = new Date().toLocaleString('en-US', {
     year: 'numeric',
@@ -46,10 +59,19 @@ function getColoredTimestamp() {
   return `${colors.brightYellow}${timestamp}${colors.reset}`;
 }
 
+/**
+ * Logs a message to the console with timestamp
+ * 
+ * @param {string} message - Message to log
+ */
 function log(message) {
   console.log(`${getColoredTimestamp()} ${message}`);
 }
 
+/**
+ * ASCII art banner for server startup
+ * @type {string}
+ */
 const banner = `
 ${colors.brightYellow}${colors.bright}╔════════════════════════════════════════════╗${colors.reset}
 ${colors.brightYellow}${colors.bright}║${colors.brightWhite}            TAUTULLI API MANAGER            ${colors.brightYellow}║${colors.reset}
@@ -57,6 +79,12 @@ ${colors.brightYellow}${colors.bright}║${colors.yellow}             Made by ${
 ${colors.brightYellow}${colors.bright}╚════════════════════════════════════════════╝${colors.reset}
 `;
 
+/**
+ * Logs server start with configuration details
+ * 
+ * @param {number} port - Server port
+ * @param {Object} config - Server configuration
+ */
 function logServerStart(port, config) {
   // Configuration loaded message
   log(`${colors.brightYellow}✓${colors.reset} ${colors.brightWhite}Loaded configuration${colors.reset}`);
@@ -67,11 +95,26 @@ function logServerStart(port, config) {
   log('');
 }
 
+/**
+ * Logs error with context
+ * 
+ * @param {string} context - Error context description
+ * @param {Error|Object} error - Error object or message
+ */
 function logError(context, error) {
   log(`${colors.brightRed}${colors.bright}ERROR: ${context}${colors.reset}`);
   log(`${colors.dim}${error.message}${colors.reset}`);
 }
 
+/**
+ * Logs HTTP request with timing information
+ * Skips logging for static files, favicon, and API calls
+ * 
+ * @param {string} method - HTTP method
+ * @param {string} path - Request path
+ * @param {number} status - HTTP status code
+ * @param {number} duration - Request duration in ms
+ */
 function logRequest(method, path, status, duration) {
   // Skip logging for static files, favicon, and API calls
   if (path.startsWith('/static/') || path.includes('favicon') || path.startsWith('/api/')) return;

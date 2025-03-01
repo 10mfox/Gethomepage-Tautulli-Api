@@ -1,51 +1,148 @@
+/**
+ * User Activity dashboard component
+ * Displays user activity with pagination and search
+ * @module components/dashboard/UserView
+ */
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useBackgroundRefresh } from '../../hooks/useBackgroundRefresh';
 
+/**
+ * User Activity dashboard component
+ * 
+ * @returns {JSX.Element} Rendered component
+ */
 const UserView = () => {
+  /**
+   * Format fields to display
+   * @type {[Array, Function]}
+   */
   const [formatFields, setFormatFields] = useState([]);
+  
+  /**
+   * Search query for filtering users
+   * @type {[string, Function]}
+   */
   const [search, setSearch] = useState('');
+  
+  /**
+   * Current page number (zero-based)
+   * @type {[number, Function]}
+   */
   const [page, setPage] = useState(0);
+  
+  /**
+   * Number of items per page
+   * @type {[number, Function]}
+   */
   const [pageSize, setPageSize] = useState(25);
+  
+  /**
+   * Total number of records
+   * @type {[number, Function]}
+   */
   const [totalRecords, setTotalRecords] = useState(0);
 
+  /**
+   * Fetches user data from the API
+   * 
+   * @async
+   * @returns {Promise<Array>} Array of user objects
+   */
   const fetchUsers = async () => {
-    const [usersResponse, formatResponse] = await Promise.all([
-      fetch(`/api/users?start=${page * pageSize}&length=${pageSize}&search=${search}`),
-      fetch('/api/users/format-settings')
-    ]);
-    
-    if (!usersResponse.ok || !formatResponse.ok) {
-      throw new Error('Failed to fetch data');
+    try {
+      const [usersResponse, formatResponse] = await Promise.all([
+        fetch(`/api/users?start=${page * pageSize}&length=${pageSize}&search=${search}`),
+        fetch('/api/users/format-settings')
+      ]);
+      
+      if (!usersResponse.ok || !formatResponse.ok) {
+        throw new Error('Failed to fetch data');
+      }
+      
+      const userData = await usersResponse.json();
+      const formatData = await formatResponse.json();
+      
+      // Ensure consistent field IDs
+      const fields = formatData.fields || [];
+      if (fields.length > 0 && fields[0].id !== 'field') {
+        fields[0].id = 'field';
+      }
+      
+      setFormatFields(fields);
+      setTotalRecords(userData.response?.recordsTotal || 0);
+      
+      // Log received data for debugging
+      console.log('Format fields:', fields);
+      console.log('User data sample:', userData.response?.data?.[0]);
+      
+      return userData.response?.data || [];
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      throw error;
     }
-    
-    const userData = await usersResponse.json();
-    const formatData = await formatResponse.json();
-    
-    setFormatFields(formatData.fields || []);
-    setTotalRecords(userData.response?.recordsTotal || 0);
-    
-    return userData.response?.data || [];
   };
 
+  /**
+   * Background refresh hook for user data
+   */
   const { 
     data: users, 
     loading, 
     error, 
     lastUpdated, 
     refresh 
-  } = useBackgroundRefresh(fetchUsers);
+  } = useBackgroundRefresh(fetchUsers, 60000); // Refresh every 60 seconds
 
   const totalPages = Math.ceil(totalRecords / pageSize);
 
+  /**
+   * Handle page change
+   * 
+   * @param {number} newPage - New page number
+   */
   const handlePageChange = (newPage) => {
     setPage(Math.max(0, Math.min(newPage, totalPages - 1)));
   };
 
+  /**
+   * Handle page size change
+   * 
+   * @param {Object} event - Change event
+   */
   const handlePageSizeChange = (event) => {
     const newSize = parseInt(event.target.value);
     setPageSize(newSize);
     setPage(0);
+  };
+
+  /**
+   * Get a user-friendly field name for display
+   * 
+   * @param {Object} field - Field object
+   * @param {number} index - Field index
+   * @returns {string} User-friendly field name
+   */
+  const getFieldDisplayName = (field, index) => {
+    if (field.id === 'field' || index === 0) {
+      return 'Primary Field';
+    } else if (field.id === 'additionalfield') {
+      return 'Additional Field';
+    }
+    // Handle any other fields by capitalizing the field ID
+    return field.id.charAt(0).toUpperCase() + field.id.slice(1);
+  };
+
+  /**
+   * Get the correct field key to access user data
+   * 
+   * @param {Object} field - Field object
+   * @param {number} index - Field index
+   * @returns {string} Field key to access user data
+   */
+  const getFieldKey = (field, index) => {
+    // First field should always use 'field' as the key
+    return index === 0 ? 'field' : field.id;
   };
 
   return (
@@ -92,9 +189,9 @@ const UserView = () => {
         <div className="data-table">
           {/* Table Header */}
           <div className="grid grid-cols-2 table-header">
-            {formatFields.map(field => (
+            {formatFields.map((field, index) => (
               <div key={field.id} className="subheader-text capitalize">
-                {field.id === 'field' ? 'Status' : field.id}
+                {getFieldDisplayName(field, index)}
               </div>
             ))}
           </div>
@@ -108,7 +205,7 @@ const UserView = () => {
               </div>
             ) : error ? (
               <div className="px-4 py-8 text-center text-red-400">
-                {error}
+                {error.message || String(error)}
               </div>
             ) : users?.length === 0 ? (
               <div className="px-4 py-8 text-center text-gray-400">
@@ -120,11 +217,14 @@ const UserView = () => {
                   key={index}
                   className="grid grid-cols-2 table-row"
                 >
-                  {formatFields.map(field => (
-                    <div key={field.id} className="text-white">
-                      {user[field.id]}
-                    </div>
-                  ))}
+                  {formatFields.map((field, fieldIndex) => {
+                    const fieldKey = getFieldKey(field, fieldIndex);
+                    return (
+                      <div key={field.id} className="text-white">
+                        {user[fieldKey] || ''}
+                      </div>
+                    );
+                  })}
                 </div>
               ))
             )}

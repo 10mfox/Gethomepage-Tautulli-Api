@@ -1,8 +1,25 @@
+/**
+ * Library sections dashboard component
+ * Displays library statistics and section information
+ * @module components/dashboard/LibraryView
+ */
 import React from 'react';
 import { RefreshCw } from 'lucide-react';
 import { useBackgroundRefresh } from '../../hooks/useBackgroundRefresh';
 
+/**
+ * Displays library sections with counts and configured status
+ * 
+ * @returns {JSX.Element} Rendered component
+ */
 const LibraryView = () => {
+  /**
+   * Fetches library data from the API
+   * 
+   * @async
+   * @returns {Promise<Object>} Library data
+   * @throws {Error} If fetch fails
+   */
   const fetchLibraries = async () => {
     try {
       const response = await fetch('/api/media/recent');
@@ -16,6 +33,9 @@ const LibraryView = () => {
     }
   };
 
+  /**
+   * Background refresh hook for library data
+   */
   const { 
     data: libraryData, 
     loading, 
@@ -24,6 +44,12 @@ const LibraryView = () => {
     refresh 
   } = useBackgroundRefresh(fetchLibraries);
 
+  /**
+   * Format count display based on library type
+   * 
+   * @param {Object} library - Library section object
+   * @returns {string} Formatted count string
+   */
   const formatCount = (library) => {
     if (library.section_type === 'movie') {
       return library.count_formatted + ' movies';

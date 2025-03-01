@@ -1,17 +1,45 @@
+/**
+ * Settings management service
+ * Handles loading, saving, and validating application settings
+ * @module services/settings
+ */
 const fs = require('fs').promises;
 const path = require('path');
 const logger = require('../../logger');
 
+/**
+ * Configuration directory path
+ * @type {string}
+ */
 const CONFIG_DIR = path.join(__dirname, '..', '..', 'config');
+
+/**
+ * Configuration file path
+ * @type {string}
+ */
 const CONFIG_FILE = path.join(CONFIG_DIR, 'settings.json');
+
+/**
+ * Maximum number of retry attempts for file operations
+ * @type {number}
+ */
 const MAX_RETRIES = 3;
+
+/**
+ * Delay between retry attempts in milliseconds
+ * @type {number}
+ */
 const RETRY_DELAY = 1000; // 1 second
 
+/**
+ * Default settings used for initialization
+ * @type {Object}
+ */
 const defaultSettings = {
   userFormats: {
     fields: [
       {
-        id: 'status_message',
+        id: 'field', // Changed from 'status_message' to 'field' for consistency
         template: '${is_watching} ( ${last_played} )'
       }
     ]
@@ -44,10 +72,20 @@ const defaultSettings = {
   }
 };
 
-// Helper function to add delay
+/**
+ * Helper function to add delay
+ * 
+ * @param {number} ms - Milliseconds to delay
+ * @returns {Promise<void>} Promise that resolves after the delay
+ */
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Helper function to validate settings
+/**
+ * Validate settings object structure
+ * 
+ * @param {Object} settings - Settings object to validate
+ * @returns {boolean} True if valid, false otherwise
+ */
 function validateSettings(settings) {
   const requiredKeys = ['userFormats', 'sections', 'mediaFormats', 'env'];
   return requiredKeys.every(key => key in settings) &&
@@ -58,6 +96,43 @@ function validateSettings(settings) {
          'TAUTULLI_API_KEY' in settings.env;
 }
 
+/**
+ * Normalize user format fields to ensure proper field IDs
+ * 
+ * @param {Object} settings - Settings object to normalize
+ * @returns {Object} Settings with normalized user formats
+ */
+function normalizeUserFormats(settings) {
+  if (settings.userFormats && Array.isArray(settings.userFormats.fields)) {
+    // Ensure we have at least one field
+    if (settings.userFormats.fields.length === 0) {
+      settings.userFormats.fields = [{ 
+        id: 'field', 
+        template: defaultSettings.userFormats.fields[0].template 
+      }];
+    }
+    
+    // Fix the first field ID if it's 'status_message'
+    if (settings.userFormats.fields.length > 0) {
+      if (settings.userFormats.fields[0].id === 'status_message') {
+        logger.log('Normalizing user format field ID from status_message to field');
+        settings.userFormats.fields[0].id = 'field';
+      }
+    }
+  }
+  
+  return settings;
+}
+
+/**
+ * Retry an operation with exponential backoff
+ * 
+ * @async
+ * @param {Function} operation - Async function to retry
+ * @param {number} [retries=MAX_RETRIES] - Maximum number of retry attempts
+ * @returns {Promise<*>} Result of the operation
+ * @throws {Error} Last error if all retries fail
+ */
 async function retryOperation(operation, retries = MAX_RETRIES) {
   let lastError;
   
@@ -78,6 +153,13 @@ async function retryOperation(operation, retries = MAX_RETRIES) {
   throw lastError;
 }
 
+/**
+ * Initialize settings
+ * Creates config directory and default settings file if necessary
+ * 
+ * @async
+ * @returns {Promise<void>}
+ */
 async function initSettings() {
   try {
     await fs.mkdir(CONFIG_DIR, { recursive: true });
@@ -109,11 +191,17 @@ async function initSettings() {
   }
 }
 
+/**
+ * Get settings from file
+ * 
+ * @async
+ * @returns {Promise<Object>} Settings object
+ */
 async function getSettings() {
   return retryOperation(async () => {
     try {
       const data = await fs.readFile(CONFIG_FILE, 'utf8');
-      const settings = JSON.parse(data);
+      let settings = JSON.parse(data);
       
       // Ensure defaults for new settings and validate
       const mergedSettings = {
@@ -129,6 +217,9 @@ async function getSettings() {
         }
       };
 
+      // Normalize user format fields
+      normalizeUserFormats(mergedSettings);
+
       if (!validateSettings(mergedSettings)) {
         throw new Error('Invalid settings format');
       }
@@ -141,9 +232,23 @@ async function getSettings() {
   });
 }
 
+/**
+ * Save settings to file
+ * Uses atomic file operations for reliability
+ * 
+ * @async
+ * @param {Object} settings - Settings object to save
+ * @returns {Promise<Object>} Saved settings object
+ */
 async function saveSettings(settings) {
   return retryOperation(async () => {
     try {
+      // Normalize user format fields before saving
+      settings = normalizeUserFormats(settings);
+      
+      // Log what we're about to save
+      logger.log('Saving user formats:', JSON.stringify(settings.userFormats, null, 2));
+      
       // Validate settings before saving
       if (!validateSettings(settings)) {
         throw new Error('Invalid settings format');

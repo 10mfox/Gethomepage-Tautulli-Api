@@ -1,18 +1,24 @@
+/**
+ * Main application component
+ * Handles routing, view management, and application state
+ * @module App
+ */
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
-import Nav from './components/Nav';
-import Footer from './components/Footer';
-import StaticBackdrop from './components/StaticBackdrop';
-import UserView from './components/dashboards/UserView';
-import RecentMediaView from './components/dashboards/RecentMediaView';
-import LibraryView from './components/dashboards/LibraryView';
-import HomepageView from './components/managers/HomepageView';
-import UserFormatView from './components/managers/UserFormatView';
-import MediaFormatView from './components/managers/MediaFormatView';
+import { Nav, Footer, StaticBackdrop } from './components/layout/Layout';
+import UserView from './components/dashboard/UserView';
+import RecentMediaView from './components/dashboard/RecentMediaView';
+import LibraryView from './components/dashboard/LibraryView';
+import UnifiedFormatManager from './components/managers/UnifiedFormatManager';
 import SectionManager from './components/managers/SectionManager';
 import EndpointsView from './components/managers/EndpointsView';
 
+/**
+ * Main application component
+ * 
+ * @returns {JSX.Element} Rendered application
+ */
 function App() {
   const [sections, setSections] = useState(null);
   const [config, setConfig] = useState(null);
@@ -20,20 +26,29 @@ function App() {
   const [activeView, setActiveView] = useState('sectionManager');
   const [isConfigured, setIsConfigured] = useState(false);
 
+  /**
+   * Left navigation items definition
+   * @type {Array<{id: string, label: string, component: React.ComponentType}>}
+   */
   const leftNavItems = [
     { id: 'users', label: 'Users', component: UserView },
     { id: 'recent', label: 'Recent Media', component: RecentMediaView },
-    { id: 'libraries', label: 'Libraries', component: LibraryView },
-    { id: 'homepage', label: 'Homepage Config', component: HomepageView }
+    { id: 'libraries', label: 'Libraries', component: LibraryView }
   ];
 
+  /**
+   * Right navigation items definition
+   * @type {Array<{id: string, label: string, component: React.ComponentType}>}
+   */
   const rightNavItems = [
-    { id: 'userDisplay', label: 'User Display', component: UserFormatView },
-    { id: 'mediaDisplay', label: 'Media Display', component: MediaFormatView },
-    { id: 'sectionManager', label: 'Section Manager', component: SectionManager },
+    { id: 'formatManager', label: 'Format Settings', component: UnifiedFormatManager },
+    { id: 'sectionManager', label: 'Setup', component: SectionManager },
     { id: 'apiEndpoints', label: 'API Endpoints', component: EndpointsView }
   ];
 
+  /**
+   * Fetch configuration and check if app is configured
+   */
   useEffect(() => {
     const fetchConfiguration = async () => {
       try {
@@ -77,6 +92,11 @@ function App() {
     fetchConfiguration();
   }, []);
 
+  /**
+   * Handle changing the active view
+   * 
+   * @param {string} view - View ID to activate
+   */
   const handleViewChange = (view) => {
     if (!isConfigured && view !== 'sectionManager') {
       // If not configured, only allow section manager
@@ -85,7 +105,12 @@ function App() {
     setActiveView(view);
   };
 
-  // Get component based on active view - only allow SectionManager if not configured
+  /**
+   * Get component based on active view
+   * Only allow SectionManager if not configured
+   * 
+   * @returns {React.ComponentType} Component for active view
+   */
   const getActiveComponent = () => {
     if (!isConfigured) {
       return SectionManager;

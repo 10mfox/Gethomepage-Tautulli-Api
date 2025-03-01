@@ -1,32 +1,74 @@
+/**
+ * Format Manager component
+ * Provides tabbed navigation between format management views
+ * @module components/FormatManager
+ */
 import React, { useState, useEffect } from 'react';
 import { Users, Film, Layout, Globe, Home } from 'lucide-react';
-import { Alert, AlertDescription } from './ui/alert';
-import UserFormatView from './managers/UserFormatView';
-import MediaFormatView from './managers/MediaFormatView';
+import { Alert, AlertDescription } from './ui/UIComponents';
+import UnifiedFormatManager from './managers/UnifiedFormatManager';
 import SectionManager from './managers/SectionManager';
 import EndpointsView from './managers/EndpointsView';
 import HomepageView from './managers/HomepageView';
 
+/**
+ * Local storage key for active tab
+ * @type {string}
+ */
 const TAB_STORAGE_KEY = 'tautulli-settings-active-tab';
 
+/**
+ * Format management component with tabbed navigation
+ * 
+ * @returns {JSX.Element} Rendered component
+ */
 const FormatManager = () => {
+  /**
+   * Library sections configuration
+   * @type {[Object|null, Function]}
+   */
   const [sections, setSections] = useState(null);
+  
+  /**
+   * Currently active management view
+   * @type {[string, Function]}
+   */
   const [activeView, setActiveView] = useState(() => {
     // Initialize from localStorage, default to 'sections' if not found
     return localStorage.getItem(TAB_STORAGE_KEY) || 'sections';
   });
+  
+  /**
+   * Error message state
+   * @type {[string, Function]}
+   */
   const [error, setError] = useState('');
+  
+  /**
+   * Success message state
+   * @type {[boolean, Function]}
+   */
   const [success, setSuccess] = useState(false);
 
+  /**
+   * Check if sections are configured
+   */
   useEffect(() => {
     checkSections();
   }, []);
 
-  // Save active tab to localStorage whenever it changes
+  /**
+   * Save active tab to localStorage when it changes
+   */
   useEffect(() => {
     localStorage.setItem(TAB_STORAGE_KEY, activeView);
   }, [activeView]);
 
+  /**
+   * Fetch section configuration
+   * 
+   * @async
+   */
   const checkSections = async () => {
     try {
       const response = await fetch('/api/media/settings');
@@ -45,11 +87,21 @@ const FormatManager = () => {
     }
   };
 
+  /**
+   * Handle error notifications
+   * 
+   * @param {string} message - Error message
+   */
   const handleError = (message) => {
     setError(message);
     setSuccess(false);
   };
 
+  /**
+   * Handle success notifications
+   * 
+   * @async
+   */
   const handleSuccess = async () => {
     setError('');
     setSuccess(true);
@@ -60,10 +112,13 @@ const FormatManager = () => {
   const hasSections = sections && 
     (sections.shows?.length > 0 || sections.movies?.length > 0);
 
+  /**
+   * Tab definitions
+   * @type {Array<{id: string, label: string, icon: React.ComponentType}>}
+   */
   const tabs = [
-    { id: 'user', label: 'User Display', icon: Users },
-    { id: 'media', label: 'Media Display', icon: Film },
-    { id: 'sections', label: 'Section Manager', icon: Layout },
+    { id: 'formats', label: 'Format Settings', icon: Users },
+    { id: 'sections', label: 'Setup', icon: Layout },
     { id: 'homepage', label: 'Homepage Config', icon: Home },
     { id: 'endpoints', label: 'API Endpoints', icon: Globe }
   ];
@@ -105,11 +160,8 @@ const FormatManager = () => {
             </div>
 
             <div className="p-6">
-              {activeView === 'user' && (
-                <UserFormatView onError={handleError} onSuccess={handleSuccess} />
-              )}
-              {activeView === 'media' && (
-                <MediaFormatView onError={handleError} onSuccess={handleSuccess} />
+              {activeView === 'formats' && (
+                <UnifiedFormatManager onError={handleError} onSuccess={handleSuccess} />
               )}
               {activeView === 'sections' && (
                 <SectionManager onError={handleError} onSuccess={handleSuccess} />

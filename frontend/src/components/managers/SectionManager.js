@@ -1,29 +1,99 @@
+/**
+ * Section Manager component
+ * Manages Tautulli connection settings and library section configuration
+ * @module components/managers/SectionManager
+ */
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription } from '../ui/alert';
+import { Alert, AlertDescription } from '../ui/UIComponents';
 
+/**
+ * Component for configuring Tautulli connection and library sections
+ * 
+ * @param {Object} props - Component props
+ * @param {Function} props.onError - Callback for error notifications
+ * @param {Function} props.onSuccess - Callback for success notifications
+ * @returns {JSX.Element} Rendered component
+ */
 const SectionManager = ({ onError, onSuccess }) => {
+  /**
+   * Selected library sections by type
+   * @type {[{shows: Array<number>, movies: Array<number>}, Function]}
+   */
   const [sections, setSections] = useState({
     shows: [],
     movies: []
   });
+  
+  /**
+   * Tautulli environment variables
+   * @type {[{TAUTULLI_BASE_URL: string, TAUTULLI_API_KEY: string}, Function]}
+   */
   const [envVars, setEnvVars] = useState({
     TAUTULLI_BASE_URL: '',
     TAUTULLI_API_KEY: ''
   });
+  
+  /**
+   * Available sections from Tautulli
+   * @type {[Array<Object>, Function]}
+   */
   const [availableSections, setAvailableSections] = useState([]);
+  
+  /**
+   * Loading state
+   * @type {[boolean, Function]}
+   */
   const [loading, setLoading] = useState(true);
+  
+  /**
+   * Refreshing state
+   * @type {[boolean, Function]}
+   */
   const [refreshing, setRefreshing] = useState(false);
+  
+  /**
+   * Connection save in progress state
+   * @type {[boolean, Function]}
+   */
   const [savingConnection, setSavingConnection] = useState(false);
+  
+  /**
+   * Sections save in progress state
+   * @type {[boolean, Function]}
+   */
   const [savingSections, setSavingSections] = useState(false);
+  
+  /**
+   * Connection test status
+   * @type {[string|null, Function]}
+   */
   const [testStatus, setTestStatus] = useState(null);
+  
+  /**
+   * API key visibility state
+   * @type {[boolean, Function]}
+   */
   const [showApiKey, setShowApiKey] = useState(false);
+  
+  /**
+   * Test connection start timestamp
+   * @type {[number|null, Function]}
+   */
   const [testStartTime, setTestStartTime] = useState(null);
 
+  /**
+   * Load data when component mounts
+   */
   useEffect(() => {
     fetchData();
   }, []);
 
+  /**
+   * Fetch data from API
+   * 
+   * @async
+   */
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -66,6 +136,11 @@ const SectionManager = ({ onError, onSuccess }) => {
     }
   };
 
+  /**
+   * Refresh data from API
+   * 
+   * @async
+   */
   const handleRefresh = async () => {
     if (!refreshing) {
       setRefreshing(true);
@@ -73,6 +148,12 @@ const SectionManager = ({ onError, onSuccess }) => {
     }
   };
 
+  /**
+   * Add a section to selected sections
+   * 
+   * @param {string} type - Section type (shows, movies)
+   * @param {number} sectionId - Section ID to add
+   */
   const addSection = (type, sectionId) => {
     setSections(prev => ({
       ...prev,
@@ -80,6 +161,12 @@ const SectionManager = ({ onError, onSuccess }) => {
     }));
   };
 
+  /**
+   * Remove a section from selected sections
+   * 
+   * @param {string} type - Section type (shows, movies)
+   * @param {number} sectionId - Section ID to remove
+   */
   const removeSection = (type, sectionId) => {
     setSections(prev => ({
       ...prev,
@@ -87,6 +174,11 @@ const SectionManager = ({ onError, onSuccess }) => {
     }));
   };
 
+  /**
+   * Test Tautulli connection with current settings
+   * 
+   * @async
+   */
   const handleTestConnection = async () => {
     try {
       if (!envVars.TAUTULLI_BASE_URL || !envVars.TAUTULLI_API_KEY) {
@@ -137,6 +229,11 @@ const SectionManager = ({ onError, onSuccess }) => {
     }
   };
 
+  /**
+   * Save Tautulli connection settings
+   * 
+   * @async
+   */
   const handleSaveConnection = async () => {
     try {
       if (!envVars.TAUTULLI_BASE_URL || !envVars.TAUTULLI_API_KEY) {
@@ -170,6 +267,11 @@ const SectionManager = ({ onError, onSuccess }) => {
     }
   };
 
+  /**
+   * Save selected sections
+   * 
+   * @async
+   */
   const handleSaveSections = async () => {
     try {
       setSavingSections(true);
@@ -204,6 +306,13 @@ const SectionManager = ({ onError, onSuccess }) => {
     }
   };
 
+  /**
+   * Section column component
+   * 
+   * @param {Object} props - Component props
+   * @param {string} props.type - Section type (shows, movies)
+   * @returns {JSX.Element} Rendered component
+   */
   const SectionColumn = ({ type }) => {
     const availableForType = availableSections.filter(section => section.type === type);
     const selectedIds = sections[type];

@@ -34,7 +34,7 @@ RUN npm install --omit=dev
 
 # Copy application files
 COPY --from=builder --chown=node:node /app/frontend/build ./frontend/build
-COPY --from=builder --chown=node:node /app/src ./src
+COPY --from=builder --chown=node:node /app/backend ./backend
 COPY --from=builder --chown=node:node /app/server.js ./
 COPY --from=builder --chown=node:node /app/logger.js ./
 

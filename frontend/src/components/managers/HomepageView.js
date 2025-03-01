@@ -1,36 +1,118 @@
+/**
+ * Homepage configuration generator component
+ * Generates YAML configurations for Homepage integration
+ * @module components/managers/HomepageView
+ */
 import React, { useState, useEffect } from 'react';
 import { Copy, Check, Monitor, Hash, Layers } from 'lucide-react';
-import { Alert, AlertDescription } from '../ui/alert';
+import { Alert, AlertDescription } from '../ui/UIComponents';
 import { 
   generateActivityYaml, 
   generateRecentMediaYaml, 
   generateMediaCountYaml 
-} from './utils/homepageConfig';
+} from '../../utils/utils';
 
+/**
+ * Component for generating Homepage integration configuration
+ * 
+ * @returns {JSX.Element} Rendered component
+ */
 const HomepageView = () => {
+  /**
+   * Configured sections by type
+   * @type {[{shows: Array<number>, movies: Array<number>}, Function]}
+   */
   const [sections, setSections] = useState({ shows: [], movies: [] });
+  
+  /**
+   * Library section names by ID
+   * @type {[Object.<string, string>, Function]}
+   */
   const [libraryNames, setLibraryNames] = useState({});
+  
+  /**
+   * Format fields for different content types
+   * @type {[{users: Array, movies: Object, shows: Object}, Function]}
+   */
   const [formatFields, setFormatFields] = useState({
     users: [],
     movies: {},
     shows: {}
   });
+  
+  /**
+   * Loading state
+   * @type {[boolean, Function]}
+   */
   const [loading, setLoading] = useState(true);
+  
+  /**
+   * Currently copied section ID
+   * @type {[string|null, Function]}
+   */
   const [copiedSection, setCopiedSection] = useState(null);
+  
+  /**
+   * Tautulli base URL
+   * @type {[string, Function]}
+   */
   const [baseUrl, setBaseUrl] = useState('');
+  
+  /**
+   * Local IP address
+   * @type {[string, Function]}
+   */
   const [localIp, setLocalIp] = useState('');
+  
+  /**
+   * Application port
+   * @type {[string, Function]}
+   */
   const [port, setPort] = useState('');
+  
+  /**
+   * User format fields
+   * @type {[Array, Function]}
+   */
   const [userFormatFields, setUserFormatFields] = useState([]);
+  
+  /**
+   * Number of items to include in each mapping
+   * @type {[{users: number, movies: number, shows: number}, Function]}
+   */
   const [mappingLengths, setMappingLengths] = useState({
     users: 15,
     movies: 15,
     shows: 15
   });
+  
+  /**
+   * Whether to show individual counts
+   * @type {[boolean, Function]}
+   */
   const [showIndividualCounts, setShowIndividualCounts] = useState(true);
+  
+  /**
+   * Whether to use formatted numbers
+   * @type {[boolean, Function]}
+   */
   const [useFormattedNumbers, setUseFormattedNumbers] = useState(true);
+  
+  /**
+   * Whether to combine sections
+   * @type {[boolean, Function]}
+   */
   const [combineSections, setCombineSections] = useState(false);
+  
+  /**
+   * Whether to show count
+   * @type {[boolean, Function]}
+   */
   const [showCount, setShowCount] = useState(false);
 
+  /**
+   * Initialize data when component mounts
+   */
   useEffect(() => {
     fetchSections();
 
@@ -44,6 +126,11 @@ const HomepageView = () => {
     };
   }, []);
 
+  /**
+   * Fetch configuration data from API
+   * 
+   * @async
+   */
   const fetchSections = async () => {
     try {
       setLoading(true);
@@ -59,33 +146,49 @@ const HomepageView = () => {
       const configData = await configResponse.json();
       const userFormatData = await userFormatResponse.json();
       
-      // Get library names and build sections object
+      // Enhanced debugging for section names
+      console.log("Media API Response:", mediaData?.response?.libraries);
+      console.log("Library sections:", mediaData?.response?.libraries?.sections);
+      
+      // Build a clean mapping of library names indexed by section ID
       const names = {};
       const processedSections = { shows: [], movies: [] };
 
+      // Process library sections from the API response
       if (mediaData?.response?.libraries?.sections) {
         mediaData.response.libraries.sections.forEach(library => {
-          names[library.section_id] = library.section_name;
+          // Make sure section_id is a primitive value (string or number)
+          const sectionId = Number(library.section_id);
+          
+          // Store section names with different key formats for robust lookups
+          names[sectionId] = library.section_name;
+          names[String(sectionId)] = library.section_name;
           
           if (library.configured) {
             if (library.section_type === 'movie') {
-              processedSections.movies.push(library.section_id);
+              // Store only the primitive section ID, not the whole object
+              processedSections.movies.push(sectionId);
             } else if (library.section_type === 'show') {
-              processedSections.shows.push(library.section_id);
+              // Store only the primitive section ID, not the whole object
+              processedSections.shows.push(sectionId);
             }
           }
         });
 
         // If we got library data but no processed sections, use settings sections
         if (!processedSections.movies.length && !processedSections.shows.length) {
-          processedSections.movies = settingsData.sections?.movies || [];
-          processedSections.shows = settingsData.sections?.shows || [];
+          processedSections.movies = (settingsData.sections?.movies || []).map(Number);
+          processedSections.shows = (settingsData.sections?.shows || []).map(Number);
         }
       } else {
         // Fallback to settings sections
-        processedSections.movies = settingsData.sections?.movies || [];
-        processedSections.shows = settingsData.sections?.shows || [];
+        processedSections.movies = (settingsData.sections?.movies || []).map(Number);
+        processedSections.shows = (settingsData.sections?.shows || []).map(Number);
       }
+      
+      // Debug the processed data
+      console.log("Processed section IDs:", processedSections);
+      console.log("Section names mapping:", names);
       
       setSections(processedSections);
       setLibraryNames(names);
@@ -105,6 +208,13 @@ const HomepageView = () => {
     }
   };
 
+  /**
+   * Copy text to clipboard
+   * 
+   * @async
+   * @param {string} text - Text to copy
+   * @param {string} section - Section identifier
+   */
   const copyToClipboard = async (text, section) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -115,6 +225,12 @@ const HomepageView = () => {
     }
   };
 
+  /**
+   * Handle mapping length change
+   * 
+   * @param {string} type - Mapping type (users, movies, shows)
+   * @param {string|number} value - New length value
+   */
   const handleLengthChange = (type, value) => {
     setMappingLengths(prev => ({
       ...prev,
@@ -122,6 +238,15 @@ const HomepageView = () => {
     }));
   };
 
+  /**
+   * Configuration section component
+   * 
+   * @param {Object} props - Component props
+   * @param {string} props.title - Section title
+   * @param {string} props.yaml - YAML configuration
+   * @param {string} props.section - Section identifier
+   * @returns {JSX.Element} Rendered component
+   */
   const ConfigSection = ({ title, yaml, section }) => (
     <div className="dark-panel">
       <div className="table-header flex items-center justify-between">
