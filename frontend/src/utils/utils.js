@@ -202,6 +202,53 @@ function extractSectionId(section) {
   return section;
 }
 
+/**
+ * Template variables by format type
+ * @type {Object}
+ */
+export const variables = {
+  user: [
+    { code: '${friendly_name}', description: 'Display name' },
+    { code: '${total_plays}', description: 'Total play count' },
+    { code: '${last_played}', description: 'Currently watching/last watched' },
+    { code: '${media_type}', description: 'Type of media' },
+    { code: '${progress_percent}', description: 'Current progress' },
+    { code: '${progress_time}', description: 'Progress timestamp' },
+    { code: '${is_watching}', description: 'Current status' },
+    { code: '${last_seen_formatted}', description: 'Last activity timestamp' },
+    { code: '${stream_container_decision}', description: 'Transcode or Direct Play' }
+  ],
+  movies: [
+    { code: '${title}', description: 'Movie title' },
+    { code: '${year}', description: 'Release year' },
+    { code: '${duration}', description: 'Runtime' },
+    { code: '${content_rating}', description: 'Content rating' },
+    { code: '${video_resolution}', description: 'Video quality' },
+    { code: '${added_at_relative}', description: 'Relative time (2d ago)' },
+    { code: '${added_at_short}', description: 'Short date (Feb 10)' }
+  ],
+  shows: [
+    { code: '${grandparent_title}', description: 'Show name' },
+    { code: '${parent_media_index}', description: 'Season number' },
+    { code: '${media_index}', description: 'Episode number' },
+    { code: '${title}', description: 'Episode title' },
+    { code: '${duration}', description: 'Runtime' },
+    { code: '${content_rating}', description: 'Content rating' },
+    { code: '${video_resolution}', description: 'Video quality' },
+    { code: '${added_at_relative}', description: 'Relative time (2d ago)' },
+    { code: '${added_at_short}', description: 'Short date (Feb 10)' }
+  ],
+  music: [
+    { code: '${parent_title}', description: 'Artist name' },
+    { code: '${title}', description: 'Album title' },
+    { code: '${year}', description: 'Release year' },
+    { code: '${studio}', description: 'Record label/Studio' },
+    { code: '${genres}', description: 'Music genres' },
+    { code: '${added_at_relative}', description: 'Relative time (2d ago)' },
+    { code: '${added_at_short}', description: 'Short date (Feb 10)' }
+  ]
+};
+
 /************** Homepage Configuration Functions **************/
 
 /**
@@ -331,11 +378,14 @@ export function generateRecentMediaYaml(
   
   const showSections = Array.isArray(sections.shows) ? 
     sections.shows.map(extractSectionId) : [];
+    
+  const musicSections = Array.isArray(sections.music) ? 
+    sections.music.map(extractSectionId) : [];
   
   // Log for debugging
-  console.log("Normalized section IDs:", { movies: movieSections, shows: showSections });
+  console.log("Normalized section IDs:", { movies: movieSections, shows: showSections, music: musicSections });
   
-  if (movieSections.length > 0 || showSections.length > 0) {
+  if (movieSections.length > 0 || showSections.length > 0 || musicSections.length > 0) {
     if (combineSections) {
       // Combined movies section
       if (movieSections.length > 0) {
@@ -443,6 +493,67 @@ ${mappings}`;
         }
         
         yaml.push(showYaml);
+      }
+      
+      // Combined music section
+      if (musicSections.length > 0) {
+        const musicSectionIds = musicSections.join(',');
+        
+        // Check for additional fields
+        let hasAdditionalField = false;
+        try {
+          hasAdditionalField = musicSections.some(id => {
+            const fields = formatFields?.music?.[id]?.fields;
+            return Array.isArray(fields) && fields.some(f => f && f.id === 'additionalfield');
+          });
+        } catch (e) {
+          console.error("Error checking for additional fields:", e);
+        }
+        
+        const mappings = generateMediaMappings(mappingLengths.music, hasAdditionalField);
+        
+        let musicYaml = `    - Music:
+        icon: mdi-music
+        id: list
+        widgets:
+          - type: customapi
+            url: http://${localIp}:3010/api/media/recent?type=music&section=${musicSectionIds}
+            method: GET
+            display: list
+            mappings:
+${mappings}`;
+
+        if (showCount) {
+          musicYaml += `
+          - type: customapi
+            url: http://${localIp}:3010/api/media/recent
+            method: GET
+            display: block
+            mappings:
+            - field:
+                response:
+                  libraries:
+                    totals:
+                      music: total_items${valueParam}
+              format: numbers
+              label: Artists
+            - field:
+                response:
+                  libraries:
+                    totals:
+                      music: total_albums${valueParam}
+              format: numbers
+              label: Albums
+            - field:
+                response:
+                  libraries:
+                    totals:
+                      music: total_tracks${valueParam}
+              format: numbers
+              label: Tracks`;
+        }
+        
+        yaml.push(musicYaml);
       }
     } else {
       let sectionIndex = 0;
@@ -574,6 +685,77 @@ ${mappings}`;
           sectionIndex++;
         });
       }
+      
+      if (musicSections.length > 0) {
+        musicSections.forEach(sectionId => {
+          // Get section fields
+          let sectionFields = [];
+          let hasAdditionalField = false;
+          
+          try {
+            sectionFields = formatFields?.music?.[sectionId]?.fields || [];
+            hasAdditionalField = sectionFields.some(f => f && f.id === 'additionalfield');
+          } catch (e) {
+            console.error(`Error accessing fields for music section ${sectionId}:`, e);
+          }
+          
+          // Get section name
+          let sectionName = `Music Section ${sectionId}`;
+          try {
+            if (libraryNames && (libraryNames[sectionId] || libraryNames[String(sectionId)])) {
+              sectionName = libraryNames[sectionId] || libraryNames[String(sectionId)];
+            }
+          } catch (e) {
+            console.error(`Error getting name for section ${sectionId}:`, e);
+          }
+          
+          const mappings = generateMediaMappings(mappingLengths.music, hasAdditionalField);
+
+          let sectionYaml = `    - ${sectionName}:
+        icon: mdi-music
+        id: list
+        widgets:
+          - type: customapi
+            url: http://${localIp}:3010/api/media/recent?type=music&section=${sectionId}
+            method: GET
+            display: list
+            mappings:
+${mappings}`;
+
+          if (showCount) {
+            sectionYaml += `
+          - type: customapi
+            url: http://${localIp}:3010/api/media/recent
+            method: GET
+            display: block
+            mappings:
+            - field:
+                response:
+                  libraries:
+                    sections:
+                      ${sectionIndex}: count${valueParam}
+              format: numbers
+              label: Artists
+            - field:
+                response:
+                  libraries:
+                    sections:
+                      ${sectionIndex}: parent_count${valueParam}
+              format: numbers
+              label: Albums
+            - field:
+                response:
+                  libraries:
+                    sections:
+                      ${sectionIndex}: child_count${valueParam}
+              format: numbers
+              label: Tracks`;
+          }
+
+          yaml.push(sectionYaml);
+          sectionIndex++;
+        });
+      }
     }
   }
 
@@ -605,6 +787,9 @@ export function generateMediaCountYaml(
   
   const showSections = Array.isArray(sections.shows) ? 
     sections.shows.map(extractSectionId) : [];
+    
+  const musicSections = Array.isArray(sections.music) ? 
+    sections.music.map(extractSectionId) : [];
   
   if (showIndividualCounts) {
     const yaml = [];
@@ -684,10 +869,57 @@ export function generateMediaCountYaml(
                label: Episodes`);
       });
     }
+    
+    // Add Music sections
+    if (musicSections.length > 0) {
+      musicSections.forEach((sectionId, index) => {
+        // Get section name
+        let sectionName = `Music Section ${sectionId}`;
+        try {
+          if (libraryNames && (libraryNames[sectionId] || libraryNames[String(sectionId)])) {
+            sectionName = libraryNames[sectionId] || libraryNames[String(sectionId)];
+          }
+        } catch (e) {
+          console.error(`Error getting name for section ${sectionId}:`, e);
+        }
+        
+        const musicIndex = movieSections.length + showSections.length + index;
+        
+        yaml.push(`    - ${sectionName}:
+         widgets:
+           - type: customapi
+             url: http://${localIp}:3010/api/media/recent
+             method: GET
+             display: block
+             mappings:
+             - field:
+                 response:
+                   libraries:
+                     sections:
+                       ${musicIndex}: count${valueParam}
+               format: numbers
+               label: Artists
+             - field:
+                 response:
+                   libraries:
+                     sections:
+                       ${musicIndex}: parent_count${valueParam}
+               format: numbers
+               label: Albums
+             - field:
+                 response:
+                   libraries:
+                     sections:
+                       ${musicIndex}: child_count${valueParam}
+               format: numbers
+               label: Tracks`);
+      });
+    }
 
     return `- Media Count:\n${yaml.join('\n\n')}`;
   } else {
-    return `- Media Count:
+    // Return combined totals YAML
+    let yaml = `- Media Count:
     - Movies:
          widgets:
            - type: customapi
@@ -731,5 +963,40 @@ export function generateMediaCountYaml(
                        shows: total_episodes${valueParam}
                format: numbers
                label: Episodes`;
+               
+    // Add Music section if we have music sections
+    if (musicSections.length > 0) {
+      yaml += `
+        - Music:
+             widgets:
+               - type: customapi
+                 url: http://${localIp}:3010/api/media/recent
+                 method: GET
+                 display: block
+                 mappings:
+                 - field:
+                     response:
+                       libraries:
+                         totals:
+                           music: total_items${valueParam}
+                   format: numbers
+                   label: Artists
+                 - field:
+                     response:
+                       libraries:
+                         totals:
+                           music: total_albums${valueParam}
+                   format: numbers
+                   label: Albums
+                 - field:
+                     response:
+                       libraries:
+                         totals:
+                           music: total_tracks${valueParam}
+                   format: numbers
+                   label: Tracks`;
+    }
+    
+    return yaml;
   }
 }

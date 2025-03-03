@@ -10,13 +10,13 @@ const { cache } = require('./cacheService');
  * Retry delay in milliseconds
  * @type {number}
  */
-const RETRY_DELAY = 2000;
+const RETRY_DELAY = 1000; // Reduced from 2000ms
 
 /**
  * Maximum number of retry attempts for API requests
  * @type {number}
  */
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 2; // Reduced from 3
 
 /**
  * Enhanced service for interacting with Tautulli API
@@ -30,7 +30,7 @@ class TautulliService {
    */
   constructor() {
     this.api = axios.create({
-      timeout: 10000,
+      timeout: 5000, // Reduced from 10000
       headers: { 
         'Accept-Encoding': 'gzip',
         'User-Agent': 'TautulliManager/1.0'
@@ -67,7 +67,7 @@ class TautulliService {
     // Default options
     const { 
       maxRetries = MAX_RETRIES, 
-      timeout = 10000,
+      timeout = 5000, // Reduced from 10000ms
       deduplicate = true
     } = options;
     
@@ -212,7 +212,7 @@ class TautulliService {
   async batchRequests(requests, options = {}) {
     const { 
       maxConcurrent = 5,
-      timeout = 15000
+      timeout = 8000 // Reduced from 15000ms
     } = options;
     
     // Group requests to process in batches
@@ -242,7 +242,7 @@ class TautulliService {
       
       // Add a small delay between batches to avoid overloading the server
       if (batches.length > 1) {
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 100)); // Reduced from 300ms
       }
     }
     

@@ -1,9 +1,9 @@
 /**
- * Homepage configuration generator component
+ * Homepage Configuration Manager component
  * Generates YAML configurations for Homepage integration
- * @module components/managers/HomepageView
+ * @module components/managers/HomepageConfigManager
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Copy, Check, Monitor, Hash, Layers } from 'lucide-react';
 import { Alert, AlertDescription } from '../ui/UIComponents';
 import { 
@@ -13,70 +13,63 @@ import {
 } from '../../utils/utils';
 
 /**
- * Component for generating Homepage integration configuration
+ * ConfigSection component for displaying YAML with copy functionality
  * 
+ * @param {Object} props - Component props
+ * @param {string} props.title - Section title
+ * @param {string} props.yaml - YAML configuration
+ * @param {string} props.section - Section identifier
+ * @param {string|null} props.copiedSection - Currently copied section
+ * @param {Function} props.copyToClipboard - Function to copy text to clipboard
  * @returns {JSX.Element} Rendered component
  */
-const HomepageView = () => {
-  /**
-   * Configured sections by type
-   * @type {[{shows: Array<number>, movies: Array<number>, music: Array<number>}, Function]}
-   */
-  const [sections, setSections] = useState({ shows: [], movies: [], music: [] });
-  
-  /**
-   * Library section names by ID
-   * @type {[Object.<string, string>, Function]}
-   */
-  const [libraryNames, setLibraryNames] = useState({});
-  
-  /**
-   * Format fields for different content types
-   * @type {[{users: Array, movies: Object, shows: Object, music: Object}, Function]}
-   */
-  const [formatFields, setFormatFields] = useState({
-    users: [],
-    movies: {},
-    shows: {},
-    music: {}
-  });
-  
-  /**
-   * Loading state
-   * @type {[boolean, Function]}
-   */
-  const [loading, setLoading] = useState(true);
-  
-  /**
-   * Currently copied section ID
-   * @type {[string|null, Function]}
-   */
-  const [copiedSection, setCopiedSection] = useState(null);
-  
-  /**
-   * Tautulli base URL
-   * @type {[string, Function]}
-   */
-  const [baseUrl, setBaseUrl] = useState('');
-  
-  /**
-   * Local IP address
-   * @type {[string, Function]}
-   */
-  const [localIp, setLocalIp] = useState('');
-  
-  /**
-   * Application port
-   * @type {[string, Function]}
-   */
-  const [port, setPort] = useState('');
-  
-  /**
-   * User format fields
-   * @type {[Array, Function]}
-   */
-  const [userFormatFields, setUserFormatFields] = useState([]);
-  
+const ConfigSection = ({ title, yaml, section, copiedSection, copyToClipboard }) => (
+  <div className="dark-panel">
+    <div className="table-header flex items-center justify-between">
+      <h3 className="header-text">{title}</h3>
+      <button
+        onClick={() => copyToClipboard(yaml, section)}
+        className="btn-primary"
+      >
+        {copiedSection === section ? (
+          <>
+            <Check className="h-4 w-4" />
+            Copied!
+          </>
+        ) : (
+          <>
+            <Copy className="h-4 w-4" />
+            Copy
+          </>
+        )}
+      </button>
+    </div>
+    <div className="p-4">
+      <pre className="code-block">
+        <code className="text-gray-300 whitespace-pre">{yaml}</code>
+      </pre>
+    </div>
+  </div>
+);
+
+/**
+ * Homepage configuration component
+ * 
+ * @param {Object} props - Component props
+ * @param {Object} props.sectionTypes - Section types with their configured sections
+ * @param {Object} props.libraryNames - Library names by section ID
+ * @param {Object} props.mediaFormats - Media format configurations
+ * @param {Array} props.userFields - User format fields
+ * @param {string} props.localIp - Local IP address
+ * @returns {JSX.Element} Rendered component
+ */
+const HomepageConfigManager = ({ 
+  sectionTypes, 
+  libraryNames, 
+  mediaFormats, 
+  userFields,
+  localIp
+}) => {
   /**
    * Number of items to include in each mapping
    * @type {[{users: number, movies: number, shows: number, music: number}, Function]}
@@ -111,110 +104,12 @@ const HomepageView = () => {
    * @type {[boolean, Function]}
    */
   const [showCount, setShowCount] = useState(false);
-
+  
   /**
-   * Initialize data when component mounts
+   * Currently copied section ID
+   * @type {[string|null, Function]}
    */
-  useEffect(() => {
-    fetchSections();
-
-    const handleSettingsUpdate = () => {
-      fetchSections();
-    };
-
-    window.addEventListener('settingsUpdated', handleSettingsUpdate);
-    return () => {
-      window.removeEventListener('settingsUpdated', handleSettingsUpdate);
-    };
-  }, []);
-
-  /**
-   * Fetch configuration data from API
-   * 
-   * @async
-   */
-  const fetchSections = async () => {
-    try {
-      setLoading(true);
-      const [settingsResponse, mediaResponse, configResponse, userFormatResponse] = await Promise.all([
-        fetch('/api/media/settings'),
-        fetch('/api/media/recent'),
-        fetch('/api/config'),
-        fetch('/api/users/format-settings')
-      ]);
-      
-      const settingsData = await settingsResponse.json();
-      const mediaData = await mediaResponse.json();
-      const configData = await configResponse.json();
-      const userFormatData = await userFormatResponse.json();
-      
-      // Enhanced debugging for section names
-      console.log("Media API Response:", mediaData?.response?.libraries);
-      console.log("Library sections:", mediaData?.response?.libraries?.sections);
-      
-      // Build a clean mapping of library names indexed by section ID
-      const names = {};
-      const processedSections = { shows: [], movies: [], music: [] };
-
-      // Process library sections from the API response
-      if (mediaData?.response?.libraries?.sections) {
-        mediaData.response.libraries.sections.forEach(library => {
-          // Make sure section_id is a primitive value (string or number)
-          const sectionId = Number(library.section_id);
-          
-          // Store section names with different key formats for robust lookups
-          names[sectionId] = library.section_name;
-          names[String(sectionId)] = library.section_name;
-          
-          if (library.configured) {
-            if (library.section_type === 'movie') {
-              // Store only the primitive section ID, not the whole object
-              processedSections.movies.push(sectionId);
-            } else if (library.section_type === 'show') {
-              // Store only the primitive section ID, not the whole object
-              processedSections.shows.push(sectionId);
-            } else if (library.section_type === 'artist' || library.section_type === 'music') {
-              // Store only the primitive section ID, not the whole object
-              processedSections.music.push(sectionId);
-            }
-          }
-        });
-
-        // If we got library data but no processed sections, use settings sections
-        if (!processedSections.movies.length && !processedSections.shows.length && !processedSections.music.length) {
-          processedSections.movies = (settingsData.sections?.movies || []).map(Number);
-          processedSections.shows = (settingsData.sections?.shows || []).map(Number);
-          processedSections.music = (settingsData.sections?.music || []).map(Number);
-        }
-      } else {
-        // Fallback to settings sections
-        processedSections.movies = (settingsData.sections?.movies || []).map(Number);
-        processedSections.shows = (settingsData.sections?.shows || []).map(Number);
-        processedSections.music = (settingsData.sections?.music || []).map(Number);
-      }
-      
-      // Debug the processed data
-      console.log("Processed section IDs:", processedSections);
-      console.log("Section names mapping:", names);
-      
-      setSections(processedSections);
-      setLibraryNames(names);
-      setFormatFields({
-        users: userFormatData.fields || [],
-        movies: settingsData.formats?.movies || {},
-        shows: settingsData.formats?.shows || {},
-        music: settingsData.formats?.music || {}
-      });
-      setUserFormatFields(userFormatData.fields || []);
-      setBaseUrl(configData.baseUrl || '');
-      setLocalIp(configData.localIp || '');
-      setPort(configData.port || '3010');
-      setLoading(false);
-    } catch (error) {
-      console.error('Failed to fetch configuration:', error);
-      setLoading(false);
-    }
-  };
+  const [copiedSection, setCopiedSection] = useState(null);
 
   /**
    * Copy text to clipboard
@@ -246,64 +141,30 @@ const HomepageView = () => {
     }));
   };
 
-  /**
-   * Configuration section component
-   * 
-   * @param {Object} props - Component props
-   * @param {string} props.title - Section title
-   * @param {string} props.yaml - YAML configuration
-   * @param {string} props.section - Section identifier
-   * @returns {JSX.Element} Rendered component
-   */
-  const ConfigSection = ({ title, yaml, section }) => (
-    <div className="dark-panel">
-      <div className="table-header flex items-center justify-between">
-        <h3 className="header-text">{title}</h3>
-        <button
-          onClick={() => copyToClipboard(yaml, section)}
-          className="btn-primary"
-        >
-          {copiedSection === section ? (
-            <>
-              <Check className="h-4 w-4" />
-              Copied!
-            </>
-          ) : (
-            <>
-              <Copy className="h-4 w-4" />
-              Copy
-            </>
-          )}
-        </button>
-      </div>
-      <div className="p-4">
-        <pre className="code-block">
-          <code className="text-gray-300 whitespace-pre">{yaml}</code>
-        </pre>
-      </div>
-    </div>
+  // Convert sectionTypes to the format expected by the YAML generation functions
+  const processedSectionTypes = {
+    movies: sectionTypes.movies.map(s => parseInt(s.id)),
+    shows: sectionTypes.shows.map(s => parseInt(s.id)),
+    music: sectionTypes.music.map(s => parseInt(s.id))
+  };
+
+  // Ensure we're using integer section IDs consistently
+  console.log('Section types for YAML generation:', processedSectionTypes);
+  console.log('Media formats:', mediaFormats);
+
+  const hasNoSections = Object.values(processedSectionTypes).every(
+    list => !Array.isArray(list) || list.length === 0
   );
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center p-8">
-        <div className="loading-spinner" />
-      </div>
-    );
-  }
-
-  const hasNoSections = sections &&
-    Object.values(sections).every(list => !Array.isArray(list) || list.length === 0);
-
   const activityConfig = generateActivityYaml(
-    { users: userFormatFields }, 
+    { users: userFields }, 
     mappingLengths, 
     localIp
   );
   
   const recentMediaConfig = generateRecentMediaYaml(
-    sections, 
-    formatFields, 
+    processedSectionTypes, 
+    mediaFormats, 
     libraryNames, 
     mappingLengths, 
     localIp,
@@ -313,7 +174,7 @@ const HomepageView = () => {
   );
   
   const mediaCountConfig = generateMediaCountYaml(
-    sections, 
+    processedSectionTypes, 
     libraryNames, 
     localIp, 
     showIndividualCounts, 
@@ -321,7 +182,7 @@ const HomepageView = () => {
   );
 
   return (
-    <div className="section-spacing">
+    <div className="space-y-6">
       <div className="dark-panel">
         <div className="table-header">
           <h3 className="header-text">Display Settings</h3>
@@ -485,11 +346,13 @@ const HomepageView = () => {
         </div>
       ) : (
         <>
-          {userFormatFields.length > 0 && (
+          {userFields.length > 0 && (
             <ConfigSection 
               title="User Activity Configuration" 
               yaml={activityConfig} 
               section="activity"
+              copiedSection={copiedSection}
+              copyToClipboard={copyToClipboard}
             />
           )}
           {recentMediaConfig && (
@@ -497,6 +360,8 @@ const HomepageView = () => {
               title="Recent Media Configuration" 
               yaml={recentMediaConfig} 
               section="recent"
+              copiedSection={copiedSection}
+              copyToClipboard={copyToClipboard}
             />
           )}
           {mediaCountConfig && (
@@ -504,6 +369,8 @@ const HomepageView = () => {
               title="Media Count Configuration" 
               yaml={mediaCountConfig} 
               section="count"
+              copiedSection={copiedSection}
+              copyToClipboard={copyToClipboard}
             />
           )}
         </>
@@ -512,4 +379,4 @@ const HomepageView = () => {
   );
 };
 
-export default HomepageView;
+export default HomepageConfigManager;

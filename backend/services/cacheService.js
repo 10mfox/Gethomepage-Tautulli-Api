@@ -7,10 +7,17 @@ const NodeCache = require('node-cache');
 const { logError, log, colors } = require('../../logger');
 
 /**
+ * Enable music-specific debugging
+ * @type {boolean}
+ */
+const DEBUG_MUSIC = true;
+
+/**
  * Interval for background updates in milliseconds
  * @type {number}
  */
-const UPDATE_INTERVAL = 60000;
+const UPDATE_INTERVAL = process.env.TAUTULLI_REFRESH_INTERVAL ? 
+  parseInt(process.env.TAUTULLI_REFRESH_INTERVAL) : 60000;
 
 /**
  * Cache TTL settings by key type (in seconds)
@@ -54,7 +61,7 @@ let updateTimer = null;
  * Flag to control verbose logging of cache operations
  * @type {boolean}
  */
-let verboseLogging = false;
+let verboseLogging = true; // Set to true to help diagnose issues
 
 /**
  * Validation schemas for cache entries
@@ -136,9 +143,9 @@ class PersistentCache {
   constructor() {
     this.cache = new NodeCache({ 
       stdTTL: CACHE_TTL_SETTINGS.default, // Default TTL
-      checkperiod: 30,     // Check for expired items more frequently (30 seconds)
-      useClones: false,     // Disable cloning for better performance
-      deleteOnExpire: false // Keep expired items until explicitly deleted
+      checkperiod: 10,     // Check for expired items more frequently (10 seconds)
+      useClones: false,    // Disable cloning for better performance
+      deleteOnExpire: true // IMPORTANT: Delete expired items immediately
     });
     
     this.lastSuccessful = {
@@ -165,15 +172,19 @@ class PersistentCache {
    */
   _setupPriorityRefreshes() {
     // Refresh user data every 30 seconds
+    log(`${colors.brightBlue}ℹ${colors.reset} Setting up priority refresh for users data (${CACHE_TTL_SETTINGS.users}s)`);
     setInterval(() => {
       if (this.refreshCallbacks['users'] && !this.refreshingKeys['users']) {
+        log(`${colors.brightBlue}ℹ${colors.reset} Triggering priority refresh for users data`);
         this.triggerBackgroundRefresh('users');
       }
     }, CACHE_TTL_SETTINGS.users * 1000);
     
     // Refresh media data every 60 seconds
+    log(`${colors.brightBlue}ℹ${colors.reset} Setting up priority refresh for media data (${CACHE_TTL_SETTINGS.recent_media}s)`);
     setInterval(() => {
       if (this.refreshCallbacks['recent_media'] && !this.refreshingKeys['recent_media']) {
+        log(`${colors.brightBlue}ℹ${colors.reset} Triggering priority refresh for media data`);
         this.triggerBackgroundRefresh('recent_media');
       }
     }, CACHE_TTL_SETTINGS.recent_media * 1000);
@@ -188,6 +199,7 @@ class PersistentCache {
   registerRefreshCallback(key, callback) {
     if (typeof callback === 'function') {
       this.refreshCallbacks[key] = callback;
+      log(`${colors.brightBlue}ℹ${colors.reset} Registered refresh callback for ${key}`);
     }
   }
 
@@ -204,14 +216,40 @@ class PersistentCache {
 
     try {
       this.refreshingKeys[key] = true;
+      log(`${colors.brightBlue}ℹ${colors.reset} Background refresh started for ${key}`);
       const data = await this.refreshCallbacks[key]();
       this.set(key, data);
+      log(`${colors.brightGreen}✓${colors.reset} Background refresh completed for ${key}`);
       return true;
     } catch (error) {
       logError(`Background Refresh - ${key}`, error);
       return false;
     } finally {
       this.refreshingKeys[key] = false;
+    }
+  }
+
+  /**
+   * Force an immediate update of a cache key
+   * This is useful for API endpoints to ensure fresh data
+   * 
+   * @param {string} key - Cache key to update
+   * @returns {Promise<boolean>} True if update was successful
+   */
+  async forceUpdate(key) {
+    if (!this.refreshCallbacks[key]) {
+      return false;
+    }
+    
+    log(`${colors.brightBlue}ℹ${colors.reset} Forcing immediate update for ${key}`);
+    
+    try {
+      const data = await this.refreshCallbacks[key]();
+      this.set(key, data);
+      return true;
+    } catch (error) {
+      logError(`Force Update - ${key}`, error);
+      return false;
     }
   }
 
@@ -307,6 +345,7 @@ class PersistentCache {
    */
   flushAll() {
     this.cache.flushAll();
+    log(`${colors.brightBlue}ℹ${colors.reset} Cache flushed`);
   }
 
   /**
@@ -365,6 +404,8 @@ async function fetchLibraryData() {
     // Break circular dependency by requiring tautulliService at runtime
     const { tautulliService } = require('./tautulli');
     
+    log(`${colors.brightBlue}ℹ${colors.reset} Fetching library data from Tautulli`);
+    
     const data = await tautulliService.makeRequest('get_libraries_table', {}, {
       deduplicate: true,
       maxRetries: 2,
@@ -376,6 +417,8 @@ async function fetchLibraryData() {
       return [];
     }
 
+    log(`${colors.brightGreen}✓${colors.reset} Fetched library data: ${data.response.data.data.length} libraries`);
+
     return data.response.data.data
       .map(library => ({
         section_name: library.section_name,
@@ -383,6 +426,10 @@ async function fetchLibraryData() {
         count: library.count,
         section_id: library.section_id,
         ...(library.section_type === 'show' ? {
+          parent_count: library.parent_count,
+          child_count: library.child_count
+        } : {}),
+        ...(library.section_type === 'artist' || library.section_type === 'music' ? {
           parent_count: library.parent_count,
           child_count: library.child_count
         } : {})
@@ -396,7 +443,7 @@ async function fetchLibraryData() {
 }
 
 /**
- * Fetch user data from Tautulli
+ * Fetch user data from Tautulli API
  * 
  * @async
  * @returns {Promise<Object>} Object containing activity and users data
@@ -405,6 +452,8 @@ async function fetchUserData() {
   try {
     // Break circular dependency by requiring tautulliService at runtime
     const { tautulliService } = require('./tautulli');
+    
+    log(`${colors.brightBlue}ℹ${colors.reset} Fetching user data from Tautulli`);
     
     // Use the batching capability of tautulliService
     const requests = [
@@ -417,10 +466,14 @@ async function fetchUserData() {
       timeout: 8000
     });
 
-    return {
+    const userData = {
       activity: activityResponse?.response?.data || { sessions: [] },
       users: usersResponse?.response?.data || { data: [] }
     };
+
+    log(`${colors.brightGreen}✓${colors.reset} Fetched user data: ${userData.activity.sessions?.length || 0} active sessions, ${userData.users.data?.length || 0} users`);
+
+    return userData;
   } catch (error) {
     const errorMessage = error.message || 'Unknown error';
     logError('User Data Fetch', { message: errorMessage });
@@ -433,25 +486,48 @@ async function fetchUserData() {
  * 
  * @async
  * @param {number|string} sectionId - Tautulli section ID
- * @param {string} mediaType - Media type (movies, shows)
+ * @param {string} mediaType - Media type (movies, shows, music)
+ * @param {Object} configuredSections - All configured section IDs by type
  * @returns {Promise<Object>} Object with section media data
  */
-async function fetchRecentMedia(sectionId, mediaType) {
+async function fetchRecentMedia(sectionId, mediaType, configuredSections) {
   try {
     // Break circular dependency by requiring tautulliService at runtime
     const { tautulliService } = require('./tautulli');
     
+    const parsedSectionId = parseInt(sectionId);
+    
+    // Determine correct section type based on configuration
+    const actualType = 
+      configuredSections.music.includes(parsedSectionId) ? 'music' :
+      configuredSections.shows.includes(parsedSectionId) ? 'shows' :
+      'movies';
+    
+    if (DEBUG_MUSIC && actualType === 'music') {
+      console.log(`Fetching section ${parsedSectionId} as ${actualType} (requested as ${mediaType})`);
+    }
+    
+    log(`${colors.brightBlue}ℹ${colors.reset} Fetching recent media for section ${parsedSectionId} (${actualType})`);
+    
     const response = await tautulliService.makeRequest('get_recently_added', {
-      section_id: sectionId,
+      section_id: parsedSectionId,
       count: 15
     }, {
       deduplicate: true,
       timeout: 8000
     });
 
+    if (DEBUG_MUSIC && actualType === 'music') {
+      const itemCount = response?.response?.data?.recently_added?.length || 0;
+      console.log(`Section ${parsedSectionId} returned ${itemCount} items`);
+    }
+
+    const itemCount = response?.response?.data?.recently_added?.length || 0;
+    log(`${colors.brightGreen}✓${colors.reset} Fetched ${itemCount} recent items for section ${parsedSectionId}`);
+
     return {
-      type: mediaType,
-      sectionId,
+      type: actualType, // Use the correct type based on configuration
+      sectionId: parsedSectionId,
       data: response?.response?.data?.recently_added || []
     };
   } catch (error) {
@@ -541,11 +617,36 @@ async function initializeCache() {
  */
 async function processMediaUpdates(libraryData) {
   try {
+    // Get settings to determine which sections are configured for which type
+    const { getSettings } = require('./settings');
+    const settings = await getSettings();
+    const configuredSections = {
+      shows: settings.sections?.shows || [],
+      movies: settings.sections?.movies || [],
+      music: settings.sections?.music || []
+    };
+
     // Extract all section IDs organized by type
     const sections = libraryData.reduce((acc, lib) => {
-      const type = lib.section_type === 'show' ? 'shows' : 'movies';
+      // Determine correct type based on configuration, not just section_type
+      let type;
+      const sectionId = parseInt(lib.section_id);
+      
+      if (configuredSections.music.includes(sectionId)) {
+        type = 'music';
+      } else if (configuredSections.shows.includes(sectionId)) {
+        type = 'shows';
+      } else if (configuredSections.movies.includes(sectionId)) {
+        type = 'movies';
+      } else {
+        // Default to original section type mapping
+        type = lib.section_type === 'show' ? 'shows' : 
+               lib.section_type === 'artist' || lib.section_type === 'music' ? 'music' :
+               'movies';
+      }
+      
       if (!acc[type]) acc[type] = [];
-      acc[type].push(lib.section_id);
+      acc[type].push(sectionId);
       return acc;
     }, {});
     
@@ -555,10 +656,12 @@ async function processMediaUpdates(libraryData) {
     Object.entries(sections).forEach(([type, sectionIds]) => {
       sectionIds.forEach(sectionId => {
         mediaRequests.push(
-          fetchRecentMedia(sectionId, type)
+          fetchRecentMedia(sectionId, type, configuredSections)
         );
       });
     });
+    
+    log(`${colors.brightBlue}ℹ${colors.reset} Processing ${mediaRequests.length} media update requests`);
     
     // Fetch media in parallel but with limits
     let mediaResults;
@@ -584,6 +687,15 @@ async function processMediaUpdates(libraryData) {
     
     // Update cache with media results that have data
     const validMediaResults = mediaResults.filter(result => result.data.length > 0);
+    
+    if (DEBUG_MUSIC) {
+      const musicResults = validMediaResults.filter(r => r.type === 'music');
+      if (musicResults.length > 0) {
+        console.log('Music results being cached:', 
+          musicResults.map(r => `${r.type}-${r.sectionId} (${r.data.length} items)`));
+      }
+    }
+    
     cache.set('recent_media', validMediaResults);
     
     log(`${colors.brightGreen}✓${colors.reset} Media cache updated successfully with ${validMediaResults.length} sections`);
@@ -635,13 +747,19 @@ function startBackgroundUpdates() {
   // Clear any existing timer
   if (updateTimer) {
     clearInterval(updateTimer);
+    log(`${colors.yellow}⚠${colors.reset} Cleared existing update timer`);
   }
 
   // Setup the background update interval
+  log(`${colors.brightBlue}ℹ${colors.reset} Starting background updates with interval: ${UPDATE_INTERVAL}ms`);
+  
   updateTimer = setInterval(async () => {
     try {
+      log(`${colors.brightBlue}ℹ${colors.reset} Background update triggered`);
+      
       // Skip update if one is already in progress
       if (updateInProgress) {
+        log(`${colors.yellow}⚠${colors.reset} Update already in progress, skipping`);
         return;
       }
       
@@ -693,8 +811,49 @@ function registerCacheCallbacks() {
   // Users refresh
   cache.registerRefreshCallback('users', fetchUserData);
   
-  // Register recent_media refresh function from media.js
-  // This is typically done in the media.js module
+  // Recent media refresh
+  cache.registerRefreshCallback('recent_media', async () => {
+    const { getSettings } = require('./settings');
+    const settings = await getSettings();
+    const configuredSections = {
+      shows: settings.sections?.shows || [],
+      movies: settings.sections?.movies || [],
+      music: settings.sections?.music || []
+    };
+
+    if (DEBUG_MUSIC) {
+      console.log('Configured sections for refresh:', configuredSections);
+    }
+
+    // Fetch each section's recent media in parallel
+    const promises = [];
+    
+    for (const type of ['shows', 'movies', 'music']) {
+      for (const sectionId of configuredSections[type]) {
+        // Format section ID consistently
+        const parsedSectionId = parseInt(sectionId);
+        
+        if (DEBUG_MUSIC && type === 'music') {
+          console.log(`Adding promise for music section ${parsedSectionId}`);
+        }
+        
+        promises.push(
+          fetchRecentMedia(parsedSectionId, type, configuredSections)
+        );
+      }
+    }
+
+    const results = await Promise.all(promises);
+    const filteredResults = results.filter(result => result.data.length > 0);
+    
+    if (DEBUG_MUSIC) {
+      console.log('Music results after refresh:', 
+        filteredResults.filter(r => r.type === 'music')
+          .map(r => `Section ${r.sectionId}: ${r.data.length} items`));
+    }
+    
+    return filteredResults;
+  });
 }
 
 module.exports = cacheExports;

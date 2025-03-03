@@ -4,7 +4,7 @@
  * @module components/managers/SectionManager
  */
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { RefreshCw, Eye, EyeOff, AlertCircle, Shield, Globe, Key, Film, Tv, Music } from 'lucide-react';
 import { Alert, AlertDescription } from '../ui/UIComponents';
 
 /**
@@ -18,11 +18,12 @@ import { Alert, AlertDescription } from '../ui/UIComponents';
 const SectionManager = ({ onError, onSuccess }) => {
   /**
    * Selected library sections by type
-   * @type {[{shows: Array<number>, movies: Array<number>}, Function]}
+   * @type {[{shows: Array<number>, movies: Array<number>, music: Array<number>}, Function]}
    */
   const [sections, setSections] = useState({
     shows: [],
-    movies: []
+    movies: [],
+    music: []
   });
   
   /**
@@ -71,6 +72,18 @@ const SectionManager = ({ onError, onSuccess }) => {
   const [testStatus, setTestStatus] = useState(null);
   
   /**
+   * Specific connection error message
+   * @type {[string|null, Function]}
+   */
+  const [connectionError, setConnectionError] = useState(null);
+  
+  /**
+   * Specific connection error type for detailed guidance
+   * @type {[string|null, Function]}
+   */
+  const [errorType, setErrorType] = useState(null);
+  
+  /**
    * API key visibility state
    * @type {[boolean, Function]}
    */
@@ -107,7 +120,7 @@ const SectionManager = ({ onError, onSuccess }) => {
       const mediaData = await mediaResponse.json();
       const configData = await configResponse.json();
       
-      setSections(settingsData.sections || { shows: [], movies: [] });
+      setSections(settingsData.sections || { shows: [], movies: [], music: [] });
       setEnvVars({
         TAUTULLI_BASE_URL: configData.baseUrl || '',
         TAUTULLI_API_KEY: configData.apiKey || ''
@@ -117,12 +130,18 @@ const SectionManager = ({ onError, onSuccess }) => {
         const available = mediaData.response.libraries.sections.map(library => ({
           id: library.section_id,
           name: library.section_name,
-          type: library.section_type === 'movie' ? 'movies' : 'shows',
+          type: library.section_type === 'movie' ? 'movies' : 
+                library.section_type === 'show' ? 'shows' : 
+                library.section_type === 'artist' || library.section_type === 'music' ? 'music' : // Add 'music' as possible identifier
+                'other',
+          section_type: library.section_type,
           count: library.count,
           count_formatted: library.count_formatted,
-          extra: library.section_type === 'show' ? {
-            seasons: library.parent_count_formatted,
-            episodes: library.child_count_formatted
+          extra: library.section_type === 'show' || 
+                 library.section_type === 'artist' || 
+                 library.section_type === 'music' ? { // Add 'music' type here too
+            parent_count: library.parent_count_formatted,
+            child_count: library.child_count_formatted
           } : null
         }));
         setAvailableSections(available);
@@ -151,7 +170,7 @@ const SectionManager = ({ onError, onSuccess }) => {
   /**
    * Add a section to selected sections
    * 
-   * @param {string} type - Section type (shows, movies)
+   * @param {string} type - Section type (shows, movies, music)
    * @param {number} sectionId - Section ID to add
    */
   const addSection = (type, sectionId) => {
@@ -164,7 +183,7 @@ const SectionManager = ({ onError, onSuccess }) => {
   /**
    * Remove a section from selected sections
    * 
-   * @param {string} type - Section type (shows, movies)
+   * @param {string} type - Section type (shows, movies, music)
    * @param {number} sectionId - Section ID to remove
    */
   const removeSection = (type, sectionId) => {
@@ -175,19 +194,89 @@ const SectionManager = ({ onError, onSuccess }) => {
   };
 
   /**
+   * Determine error type from error message for targeted guidance
+   * 
+   * @param {string} errorMessage - The error message
+   * @returns {string} Error type identifier
+   */
+  const determineErrorType = (errorMessage) => {
+    if (!errorMessage) return 'unknown';
+    
+    const lowerErrorMsg = errorMessage.toLowerCase();
+    
+    if (lowerErrorMsg.includes('please enter both')) return 'missing_fields';
+    if (lowerErrorMsg.includes('timeout') || lowerErrorMsg.includes('econnaborted')) return 'timeout';
+    if (lowerErrorMsg.includes('refused') || lowerErrorMsg.includes('econnrefused')) return 'connection_refused';
+    if (lowerErrorMsg.includes('network') || lowerErrorMsg.includes('unreachable')) return 'network';
+    if (lowerErrorMsg.includes('api key') || lowerErrorMsg.includes('invalid key') || lowerErrorMsg.includes('unauthorized')) return 'invalid_api_key';
+    if (lowerErrorMsg.includes('https://') || lowerErrorMsg.includes('http://') || lowerErrorMsg.includes('url') || lowerErrorMsg.includes('uri')) return 'invalid_url';
+    if (lowerErrorMsg.includes('not found') || lowerErrorMsg.includes('404')) return 'not_found';
+    if (lowerErrorMsg.includes('500') || lowerErrorMsg.includes('server error')) return 'server_error';
+    
+    return 'unknown';
+  };
+
+  /**
+   * Validate URL format
+   * 
+   * @param {string} url - URL to validate
+   * @returns {boolean} True if URL is valid
+   */
+  const isValidUrl = (url) => {
+    try {
+      new URL(url);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  /**
    * Test Tautulli connection with current settings
    * 
    * @async
    */
   const handleTestConnection = async () => {
     try {
-      if (!envVars.TAUTULLI_BASE_URL || !envVars.TAUTULLI_API_KEY) {
+      // Reset error states
+      setErrorType(null);
+      
+      // Validate inputs before sending request
+      if (!envVars.TAUTULLI_BASE_URL && !envVars.TAUTULLI_API_KEY) {
         setTestStatus('error');
+        setConnectionError('Please enter both Base URL and API Key');
+        setErrorType('missing_fields');
         onError('Please enter both Base URL and API Key');
+        return;
+      }
+      
+      if (!envVars.TAUTULLI_BASE_URL) {
+        setTestStatus('error');
+        setConnectionError('Tautulli Base URL is required');
+        setErrorType('missing_url');
+        onError('Tautulli Base URL is required');
+        return;
+      }
+      
+      if (!envVars.TAUTULLI_API_KEY) {
+        setTestStatus('error');
+        setConnectionError('Tautulli API Key is required');
+        setErrorType('missing_api_key');
+        onError('Tautulli API Key is required');
+        return;
+      }
+      
+      // Validate URL format
+      if (!isValidUrl(envVars.TAUTULLI_BASE_URL)) {
+        setTestStatus('error');
+        setConnectionError('Invalid URL format. URL must include http:// or https://');
+        setErrorType('invalid_url');
+        onError('Invalid URL format');
         return;
       }
 
       setTestStatus('testing');
+      setConnectionError(null);
       setTestStartTime(Date.now());
       
       // Define the endpoint with parameters optimized for quick response
@@ -203,7 +292,8 @@ const SectionManager = ({ onError, onSuccess }) => {
       });
 
       if (!response.ok) {
-        throw new Error('Connection test failed');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server returned ${response.status}`);
       }
 
       const data = await response.json();
@@ -213,19 +303,28 @@ const SectionManager = ({ onError, onSuccess }) => {
         const testDuration = Date.now() - testStartTime;
         
         // Ensure the success message appears for at least 1.5 seconds
-        // This gives the user time to see it even if the test is super fast
         if (testDuration < 1500) {
           await new Promise(resolve => setTimeout(resolve, 1500 - testDuration));
         }
         
         setTestStatus('success');
+        setConnectionError(null);
+        setErrorType(null);
         setTimeout(() => setTestStatus(null), 3000);
       } else {
         throw new Error(data.error || 'Connection verification failed');
       }
     } catch (error) {
       setTestStatus('error');
-      onError(error.message || 'Failed to connect to Tautulli');
+      
+      // Set the specific error message
+      const errorMessage = error.message || 'Failed to connect to Tautulli';
+      setConnectionError(errorMessage);
+      
+      // Determine the error type for targeted guidance
+      setErrorType(determineErrorType(errorMessage));
+      
+      onError(errorMessage);
     }
   };
 
@@ -307,14 +406,144 @@ const SectionManager = ({ onError, onSuccess }) => {
   };
 
   /**
+   * Render error guidance based on error type
+   * 
+   * @returns {JSX.Element|null} Error guidance component
+   */
+  const renderErrorGuidance = () => {
+    if (!errorType) return null;
+
+    switch (errorType) {
+      case 'timeout':
+        return (
+          <div className="flex items-start gap-2 mt-2 border-t border-red-900/20 pt-2">
+            <Globe className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+            <p className="text-gray-400 text-xs">
+              The connection timed out. This usually means the server is unreachable or taking too long to respond. Make sure your Tautulli server is running and accessible from this location.
+            </p>
+          </div>
+        );
+      
+      case 'connection_refused':
+        return (
+          <div className="flex items-start gap-2 mt-2 border-t border-red-900/20 pt-2">
+            <Shield className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+            <p className="text-gray-400 text-xs">
+              Connection was actively refused. This typically means the server is not running, the port is incorrect, or a firewall is blocking the connection. Check that:
+              <br />- Your Tautulli server is running
+              <br />- The port number is correct (default is 8181)
+              <br />- No firewall is blocking the connection
+            </p>
+          </div>
+        );
+        
+      case 'invalid_api_key':
+        return (
+          <div className="flex items-start gap-2 mt-2 border-t border-red-900/20 pt-2">
+            <Key className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+            <p className="text-gray-400 text-xs">
+              Your API key appears to be invalid. To locate your Tautulli API key:
+              <br />1. Go to Tautulli web interface
+              <br />2. Navigate to "Settings" → "Web Interface" → "API"
+              <br />3. Copy your API key or generate a new one
+            </p>
+          </div>
+        );
+        
+      case 'invalid_url':
+        return (
+          <div className="flex items-start gap-2 mt-2 border-t border-red-900/20 pt-2">
+            <Globe className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+            <p className="text-gray-400 text-xs">
+              The URL format is invalid. Please ensure:
+              <br />- URL begins with http:// or https://
+              <br />- Include the port number if not using the default port (e.g., http://localhost:8181)
+              <br />- Do not include trailing paths like /api or /web
+            </p>
+          </div>
+        );
+        
+      case 'not_found':
+        return (
+          <div className="flex items-start gap-2 mt-2 border-t border-red-900/20 pt-2">
+            <Globe className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+            <p className="text-gray-400 text-xs">
+              The server was reached but the page was not found (404). This usually means:
+              <br />- The URL path is incorrect
+              <br />- Tautulli is installed but not running at the specified path
+              <br />- Try removing any trailing paths and only use the base URL (e.g., http://server:8181)
+            </p>
+          </div>
+        );
+        
+      case 'server_error':
+        return (
+          <div className="flex items-start gap-2 mt-2 border-t border-red-900/20 pt-2">
+            <AlertCircle className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+            <p className="text-gray-400 text-xs">
+              The Tautulli server encountered an internal error. Try these steps:
+              <br />- Check your Tautulli logs for errors
+              <br />- Restart your Tautulli server
+              <br />- Ensure your Tautulli installation is up-to-date
+            </p>
+          </div>
+        );
+        
+      case 'network':
+        return (
+          <div className="flex items-start gap-2 mt-2 border-t border-red-900/20 pt-2">
+            <Globe className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+            <p className="text-gray-400 text-xs">
+              A network error occurred. Check that:
+              <br />- Your device has internet connectivity
+              <br />- The hostname in the URL is correct and can be resolved
+              <br />- If using a local address, ensure both systems are on the same network
+            </p>
+          </div>
+        );
+        
+      case 'missing_fields':
+      case 'missing_url':
+      case 'missing_api_key':
+        return (
+          <div className="flex items-start gap-2 mt-2 border-t border-red-900/20 pt-2">
+            <AlertCircle className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+            <p className="text-gray-400 text-xs">
+              Please fill in all required fields. You need both a valid Tautulli base URL and API key to connect.
+            </p>
+          </div>
+        );
+        
+      default:
+        return (
+          <div className="flex items-start gap-2 mt-2 border-t border-red-900/20 pt-2">
+            <AlertCircle className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+            <p className="text-gray-400 text-xs">
+              An unexpected error occurred. Please check:
+              <br />- Your Tautulli server is running and accessible
+              <br />- The URL and API key are correct
+              <br />- Your network configuration allows this connection
+            </p>
+          </div>
+        );
+    }
+  };
+
+  /**
    * Section column component
    * 
    * @param {Object} props - Component props
-   * @param {string} props.type - Section type (shows, movies)
+   * @param {string} props.type - Section type (shows, movies, music)
    * @returns {JSX.Element} Rendered component
    */
   const SectionColumn = ({ type }) => {
-    const availableForType = availableSections.filter(section => section.type === type);
+    const availableForType = availableSections.filter(section => {
+      // Map Tautulli's 'artist' type to our 'music' type
+      if (type === 'music') {
+        return section.type === 'music' || section.section_type === 'artist';
+      }
+      return section.type === type;
+    });
     const selectedIds = sections[type];
 
     if (loading) {
@@ -333,12 +562,18 @@ const SectionManager = ({ onError, onSuccess }) => {
       );
     }
 
+    // Get icon based on type
+    const TypeIcon = type === 'movies' ? Film : type === 'shows' ? Tv : Music;
+
     return (
       <div className="flex-1">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="header-text capitalize">
-            {type}
-          </h3>
+          <div className="flex items-center gap-2">
+            <TypeIcon className="h-4 w-4 text-theme-accent" />
+            <h3 className="header-text capitalize">
+              {type}
+            </h3>
+          </div>
           <button
             onClick={handleRefresh}
             disabled={refreshing}
@@ -375,7 +610,11 @@ const SectionManager = ({ onError, onSuccess }) => {
                     <div>{section.count_formatted} items</div>
                     {section.extra && (
                       <div className="text-xs">
-                        {section.extra.seasons} seasons, {section.extra.episodes} episodes
+                        {type === 'shows' ? 
+                          `${section.extra.parent_count} seasons, ${section.extra.child_count} episodes` : 
+                          type === 'music' ? 
+                          `${section.extra.parent_count} albums, ${section.extra.child_count} tracks` : 
+                          ''}
                       </div>
                     )}
                   </div>
@@ -395,7 +634,7 @@ const SectionManager = ({ onError, onSuccess }) => {
   };
 
   const hasSections = sections && 
-    (sections.shows?.length > 0 || sections.movies?.length > 0);
+    (sections.shows?.length > 0 || sections.movies?.length > 0 || sections.music?.length > 0);
 
   if (loading) {
     return (
@@ -458,6 +697,22 @@ const SectionManager = ({ onError, onSuccess }) => {
               </div>
             </div>
 
+            {testStatus === 'error' && connectionError && (
+              <div className="mt-4 p-3 bg-red-950/30 border border-red-700/50 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <div className="text-red-400 mt-0.5 flex-shrink-0">
+                    <AlertCircle className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-red-400 font-medium mb-1">Connection Failed</h4>
+                    <p className="text-red-200 text-sm">{connectionError}</p>
+                    
+                    {renderErrorGuidance()}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <button
                 onClick={handleTestConnection}
@@ -490,9 +745,10 @@ const SectionManager = ({ onError, onSuccess }) => {
           </div>
           
           <div className="p-4 space-y-6">
-            <div className="grid grid-cols-2 gap-8">
-              <SectionColumn type="shows" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <SectionColumn type="movies" />
+              <SectionColumn type="shows" />
+              <SectionColumn type="music" />
             </div>
 
             <button
@@ -560,6 +816,22 @@ const SectionManager = ({ onError, onSuccess }) => {
             </div>
           </div>
 
+          {testStatus === 'error' && connectionError && (
+            <div className="mt-4 p-3 bg-red-950/30 border border-red-700/50 rounded-lg">
+              <div className="flex items-start gap-2">
+                <div className="text-red-400 mt-0.5 flex-shrink-0">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-red-400 font-medium mb-1">Connection Failed</h4>
+                  <p className="text-red-200 text-sm">{connectionError}</p>
+                  
+                  {renderErrorGuidance()}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <button
               onClick={handleTestConnection}
@@ -591,9 +863,10 @@ const SectionManager = ({ onError, onSuccess }) => {
           <h3 className="header-text">Library Sections</h3>
         </div>
         <div className="p-4 space-y-6">
-          <div className="grid grid-cols-2 gap-8">
-            <SectionColumn type="shows" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <SectionColumn type="movies" />
+            <SectionColumn type="shows" />
+            <SectionColumn type="music" />
           </div>
 
           <button

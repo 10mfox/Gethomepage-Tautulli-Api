@@ -36,6 +36,14 @@ function getLocalIpAddress() {
 
 const app = express();
 const PORT = process.env.TAUTULLI_CUSTOM_PORT || 3010;
+const REFRESH_INTERVAL = process.env.TAUTULLI_REFRESH_INTERVAL ? 
+  parseInt(process.env.TAUTULLI_REFRESH_INTERVAL) : 60000;
+
+// Export for other modules to use
+app.locals.refreshInterval = REFRESH_INTERVAL;
+
+// Log the configured refresh interval
+logger.log(`Configured refresh interval: ${REFRESH_INTERVAL}ms`);
 
 // Compression middleware - apply to all routes
 app.use(compression({
@@ -56,6 +64,20 @@ app.use(compression({
 app.use(express.json());
 
 /**
+ * Prevent API caching middleware
+ * Ensures API responses aren't cached by browsers or proxies
+ */
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    // Prevent caching for all API endpoints
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
+
+/**
  * Cache control middleware
  * Sets appropriate cache headers based on route patterns
  */
@@ -64,10 +86,10 @@ app.use((req, res, next) => {
   if (req.method === 'GET') {
     if (req.path.startsWith('/api/media/recent')) {
       // Media data can be cached longer
-      res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutes
+      res.setHeader('Cache-Control', 'no-cache, max-age=0');
     } else if (req.path.startsWith('/api/users')) {
       // User activity changes more frequently
-      res.setHeader('Cache-Control', 'public, max-age=60'); // 1 minute
+      res.setHeader('Cache-Control', 'no-cache, max-age=0');
     } else if (req.path.startsWith('/api/health') || req.path.startsWith('/api/config')) {
       // Configuration and health checks should not be cached
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -108,6 +130,68 @@ app.post('/api/cache/clear', (req, res) => {
   initializeCache()
     .then(() => res.json({ success: true }))
     .catch(error => res.status(500).json({ error: error.message }));
+});
+
+/**
+ * Force refresh endpoint
+ * Forces a cache refresh and returns success status
+ * 
+ * @route POST /api/force-refresh
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response indicating success or failure
+ */
+app.post('/api/force-refresh', async (req, res) => {
+  try {
+    logger.log('Force refresh requested');
+    await initializeCache();
+    res.json({ success: true, timestamp: new Date().toISOString() });
+  } catch (error) {
+    logger.logError('Force Refresh', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Force refresh specific cache data
+ * 
+ * @route POST /api/force-refresh/:key
+ * @param {Object} req - Express request object
+ * @param {Object} req.params - Route parameters
+ * @param {string} req.params.key - Cache key to refresh
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response indicating success or failure
+ */
+app.post('/api/force-refresh/:key', async (req, res) => {
+  try {
+    const { key } = req.params;
+    
+    if (!key || !['users', 'libraries', 'recent_media'].includes(key)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid or missing cache key' 
+      });
+    }
+    
+    logger.log(`Force refresh requested for ${key}`);
+    const success = await cache.forceUpdate(key);
+    
+    if (success) {
+      res.json({ 
+        success: true, 
+        message: `${key} data refreshed successfully`,
+        timestamp: new Date().toISOString() 
+      });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        error: `Failed to refresh ${key} data` 
+      });
+    }
+  } catch (error) {
+    logger.logError('Force Refresh', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 /**
@@ -261,6 +345,7 @@ app.get('/api/config', async (req, res) => {
       baseUrl: settings.env.TAUTULLI_BASE_URL || '',
       apiKey: settings.env.TAUTULLI_API_KEY || '',
       port: process.env.TAUTULLI_CUSTOM_PORT || 3010,
+      refreshInterval: parseInt(process.env.TAUTULLI_REFRESH_INTERVAL || 60000),
       localIp: getLocalIpAddress(),
       sections: settings.sections || {},
       formats: settings.mediaFormats || {}

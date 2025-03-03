@@ -171,14 +171,16 @@ router.get('/', async (req, res) => {
       length = 25
     } = req.query;
 
+    // Force no caching
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     // Calculate cache key based on query parameters
     const cacheKey = `${USER_LIST_CACHE_PREFIX}${order_column}:${order_dir}:${search}:${start}:${length}`;
     
-    // Check cache first
-    const cachedData = cache.get(cacheKey);
-    if (cachedData) {
-      return res.json(cachedData);
-    }
+    // Clear this key from cache first to ensure fresh data
+    cache.cache.del(cacheKey);
 
     const settings = await getSettings();
     const formatFields = settings.userFormats?.fields || [];
@@ -187,11 +189,14 @@ router.get('/', async (req, res) => {
       throw new Error('Tautulli configuration missing');
     }
 
-    // Get user data from the main cache
-    const userData = cache.get('users');
+    // Get user data from the main cache - ALWAYS REFRESH
+    // This ensures we don't use stale data
+    const userData = cache.get('users', true);
     if (!userData) {
       throw new Error('User data not available');
     }
+
+    console.log(`Generating fresh user data response with ${userData.activity.sessions?.length || 0} active sessions`);
 
     const watchingUsers = {};
     userData.activity.sessions?.forEach(session => {

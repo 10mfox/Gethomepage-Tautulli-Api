@@ -4,8 +4,14 @@
  * @module components/dashboard/UserView
  */
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useBackgroundRefresh } from '../../hooks/useBackgroundRefresh';
+
+/**
+ * This dashboard automatically refreshes data based on the server-configured interval
+ * No refresh button is needed as data is updated in the background
+ * Default refresh interval: 60 seconds (configurable via TAUTULLI_REFRESH_INTERVAL)
+ */
 
 /**
  * User Activity dashboard component
@@ -42,6 +48,37 @@ const UserView = () => {
    * @type {[number, Function]}
    */
   const [totalRecords, setTotalRecords] = useState(0);
+  
+  /**
+   * Server refresh interval
+   * @type {[number, Function]}
+   */
+  const [refreshInterval, setRefreshInterval] = useState(60000);
+
+  /**
+   * Fetch configuration when component mounts
+   */
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const response = await fetch('/api/config', {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        const data = await response.json();
+        if (data.refreshInterval) {
+          console.log(`Setting refresh interval to ${data.refreshInterval}ms`);
+          setRefreshInterval(data.refreshInterval);
+        }
+      } catch (error) {
+        console.error('Error fetching configuration:', error);
+      }
+    };
+    
+    fetchConfig();
+  }, []);
 
   /**
    * Fetches user data from the API
@@ -51,9 +88,20 @@ const UserView = () => {
    */
   const fetchUsers = async () => {
     try {
+      console.log('Fetching user data...');
       const [usersResponse, formatResponse] = await Promise.all([
-        fetch(`/api/users?start=${page * pageSize}&length=${pageSize}&search=${search}`),
-        fetch('/api/users/format-settings')
+        fetch(`/api/users?start=${page * pageSize}&length=${pageSize}&search=${search}`, {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        }),
+        fetch('/api/users/format-settings', {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
       ]);
       
       if (!usersResponse.ok || !formatResponse.ok) {
@@ -72,9 +120,7 @@ const UserView = () => {
       setFormatFields(fields);
       setTotalRecords(userData.response?.recordsTotal || 0);
       
-      // Log received data for debugging
-      console.log('Format fields:', fields);
-      console.log('User data sample:', userData.response?.data?.[0]);
+      console.log(`Fetched ${userData.response?.data?.length || 0} users`);
       
       return userData.response?.data || [];
     } catch (error) {
@@ -89,10 +135,39 @@ const UserView = () => {
   const { 
     data: users, 
     loading, 
-    error, 
-    lastUpdated, 
-    refresh 
-  } = useBackgroundRefresh(fetchUsers, 60000); // Refresh every 60 seconds
+    error,
+    refresh
+  } = useBackgroundRefresh(fetchUsers, refreshInterval);
+  
+  /**
+   * Set up a timer to force refresh data periodically
+   * This ensures we always have the latest data
+   */
+  useEffect(() => {
+    console.log(`Setting up manual refresh timer (${refreshInterval}ms)`);
+    
+    // Force refresh immediately on mount
+    refresh();
+    
+    // Set up a timer to force refresh data
+    const refreshTimer = setInterval(() => {
+      console.log('Manual refresh timer triggered');
+      refresh();
+    }, refreshInterval);
+    
+    return () => {
+      console.log('Cleaning up manual refresh timer');
+      clearInterval(refreshTimer);
+    };
+  }, [refresh, refreshInterval]);
+
+  /**
+   * Force refresh when pagination or search changes
+   */
+  useEffect(() => {
+    console.log(`Page or search changed: page=${page}, search=${search}`);
+    refresh();
+  }, [page, pageSize, search, refresh]);
 
   const totalPages = Math.ceil(totalRecords / pageSize);
 
@@ -161,7 +236,7 @@ const UserView = () => {
               className="input-field w-64"
             />
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
             <select
               value={pageSize}
               onChange={handlePageSizeChange}
@@ -172,15 +247,9 @@ const UserView = () => {
               <option value="50">50 per page</option>
               <option value="100">100 per page</option>
             </select>
-
-            <button 
-              onClick={refresh}
-              className="btn-primary"
-              disabled={loading}
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+            <div className="text-xs text-gray-400">
+              Auto-refreshes every {Math.round(refreshInterval/1000)} seconds
+            </div>
           </div>
         </div>
       </div>

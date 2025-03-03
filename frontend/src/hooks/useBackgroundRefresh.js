@@ -9,7 +9,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  * Custom hook for fetching data with periodic background refresh
  * 
  * @param {Function} fetchFn - Async function to fetch data
- * @param {number} [initialInterval=60000] - Refresh interval in milliseconds
+ * @param {number} [initialInterval=null] - Refresh interval in milliseconds (optional override)
  * @returns {Object} Hook state and controls
  * @returns {*} returns.data - The fetched data
  * @returns {boolean} returns.loading - Loading state
@@ -17,14 +17,41 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  * @returns {Date|null} returns.lastUpdated - Timestamp of last successful update
  * @returns {Function} returns.refresh - Function to manually trigger refresh
  */
-export const useBackgroundRefresh = (fetchFn, initialInterval = 60000) => {
+export const useBackgroundRefresh = (fetchFn, initialInterval = null) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [serverInterval, setServerInterval] = useState(60000); // Default until fetched
   const previousDataRef = useRef(null);
   const intervalRef = useRef(null);
   const fetchingRef = useRef(false);
+
+  // Fetch server refresh interval on hook initialization
+  useEffect(() => {
+    const getRefreshInterval = async () => {
+      try {
+        const response = await fetch('/api/config', {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        const config = await response.json();
+        if (config.refreshInterval) {
+          console.log(`Server configured refresh interval: ${config.refreshInterval}ms`);
+          setServerInterval(config.refreshInterval);
+        }
+      } catch (err) {
+        console.error('Failed to fetch refresh interval', err);
+      }
+    };
+    
+    getRefreshInterval();
+  }, []);
+
+  // Use initialInterval if provided, otherwise use the server interval
+  const effectiveInterval = initialInterval || serverInterval;
 
   /**
    * Check if two data objects are equal
@@ -54,13 +81,17 @@ export const useBackgroundRefresh = (fetchFn, initialInterval = 60000) => {
     
     try {
       fetchingRef.current = true;
+      console.log('Fetching data...');
       const result = await fetchFn();
       
       // Only update if data has changed or force refresh
       if (!isEqual(result, previousDataRef.current) || force) {
+        console.log('Data changed, updating state');
         setData(result);
         previousDataRef.current = result;
         setLastUpdated(new Date());
+      } else {
+        console.log('No data changes detected');
       }
       
       setError(null);
@@ -77,22 +108,33 @@ export const useBackgroundRefresh = (fetchFn, initialInterval = 60000) => {
   useEffect(() => {
     // Initial fetch
     fetch(true);
+    
+    console.log(`Setting up refresh interval: ${effectiveInterval}ms`);
 
-    // Set up interval
-    intervalRef.current = setInterval(() => {
+    // Set up interval with a reference to prevent stale closures
+    const intervalId = setInterval(() => {
+      console.log('Background refresh interval triggered');
       fetch(false);
-    }, initialInterval);
+    }, effectiveInterval);
+
+    // Store the interval ID for cleanup
+    intervalRef.current = intervalId;
 
     // Cleanup
     return () => {
+      console.log('Cleaning up interval');
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
-  }, [fetch, initialInterval]);
+  }, [fetch, effectiveInterval]);
 
   // Manual refresh function
-  const refresh = useCallback(() => fetch(true), [fetch]);
+  const refresh = useCallback(() => {
+    console.log('Manual refresh triggered');
+    return fetch(true);
+  }, [fetch]);
 
   return {
     data,

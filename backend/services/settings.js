@@ -46,7 +46,8 @@ const defaultSettings = {
   },
   sections: {
     shows: [],
-    movies: []
+    movies: [],
+    music: []
   },
   mediaFormats: {
     shows: {
@@ -62,6 +63,22 @@ const defaultSettings = {
         {
           id: 'title',
           template: '${title} (${year})'
+        }
+      ]
+    },
+    music: {
+      fields: [
+        {
+          id: 'title',
+          template: '${parent_title} - ${title}'
+        },
+        {
+          id: 'details',
+          template: '${year} - ${studio}'
+        },
+        {
+          id: 'genres',
+          template: '${genres}'
         }
       ]
     }
@@ -91,6 +108,7 @@ function validateSettings(settings) {
   return requiredKeys.every(key => key in settings) &&
          Array.isArray(settings.sections.shows) &&
          Array.isArray(settings.sections.movies) &&
+         Array.isArray(settings.sections.music) &&
          typeof settings.env === 'object' &&
          'TAUTULLI_BASE_URL' in settings.env &&
          'TAUTULLI_API_KEY' in settings.env;
@@ -210,6 +228,10 @@ async function getSettings() {
         mediaFormats: {
           ...defaultSettings.mediaFormats,
           ...settings.mediaFormats
+        },
+        sections: {
+          ...defaultSettings.sections,
+          ...settings.sections
         },
         env: {
           ...defaultSettings.env,

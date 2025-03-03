@@ -4,8 +4,14 @@
  * @module components/dashboard/RecentMediaView
  */
 import React, { useState, useMemo, useEffect } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { Film, Tv, Music } from 'lucide-react';
 import { useBackgroundRefresh } from '../../hooks/useBackgroundRefresh';
+
+/**
+ * This dashboard automatically refreshes data based on the server-configured interval
+ * No refresh button is needed as data is updated in the background
+ * Default refresh interval: 60 seconds (configurable via TAUTULLI_REFRESH_INTERVAL)
+ */
 
 /**
  * Maximum number of results to display per section
@@ -29,20 +35,41 @@ const MediaItem = React.memo(({ item, tautulliBaseUrl }) => {
     posterUrl = `${tautulliBaseUrl}/pms_image_proxy?img=/library/metadata/${item.ratingKey}/thumb`;
   }
   
-  // Extract year from item data if available
-  const year = item.additionalfield?.match(/\d{4}/) || item.field?.match(/\((\d{4})\)/)?.at(1) || '';
+  // Determine if this is a music item
+  const isMusicItem = item.media_type === 'music' || item.media_type === 'album';
   
-  // Format for duration or runtime
-  const duration = item.additionalfield?.includes('min') ? 
-    item.additionalfield.match(/\d+min/) : '';
+  // Extract title/artist information
+  let title, subtitle;
+  if (isMusicItem) {
+    // For music, split "Artist - Album" format
+    const parts = item.field?.split(' - ');
+    title = parts?.[1] || item.field || 'Unknown Album'; // Album name as primary title
+    subtitle = parts?.[0] || 'Unknown Artist'; // Artist name as subtitle
+  } else {
+    // For movies/shows, use the field directly
+    title = item.field || 'Untitled';
+    
+    // Extract year from item data if available
+    subtitle = item.additionalfield?.match(/\d{4}/) || item.field?.match(/\((\d{4})\)/)?.at(1) || '';
+    
+    // Add duration if available
+    const duration = item.additionalfield?.includes('min') ? 
+      item.additionalfield.match(/\d+min/) : '';
+      
+    if (duration && subtitle) {
+      subtitle = `${subtitle} • ${duration}`;
+    } else if (duration) {
+      subtitle = duration;
+    }
+  }
 
   return (
     <div className="dark-panel flex flex-col overflow-hidden h-full">
-      {/* Poster Image */}
-      <div className="relative w-full aspect-[2/3] bg-black/40 overflow-hidden group">
+      {/* Poster Image - use square aspect ratio for music, 2:3 for movies/shows */}
+      <div className={`relative w-full ${isMusicItem ? 'aspect-square' : 'aspect-[2/3]'} bg-black/40 overflow-hidden group`}>
         <img 
           src={posterUrl} 
-          alt={item.field || 'Media poster'} 
+          alt={title} 
           className="w-full h-full object-cover"
           onError={(e) => { e.target.src = '/static/poster-placeholder.jpg' }}
         />
@@ -53,14 +80,17 @@ const MediaItem = React.memo(({ item, tautulliBaseUrl }) => {
         )}
       </div>
       
-      {/* Content Details */}
+      {/* Content Details - Standardized for all media types */}
       <div className="p-3 flex flex-col flex-grow">
         <div className="text-white font-medium text-sm line-clamp-2 mb-1">
-          {item.field || 'Untitled'}
+          {title}
         </div>
         <div className="flex items-center gap-2 text-xs text-gray-400">
-          {year && <span>{year}</span>}
-          {duration && <span>{duration}</span>}
+          {isMusicItem ? (
+            <span className="text-theme-accent">{subtitle}</span>
+          ) : (
+            <span>{subtitle}</span>
+          )}
         </div>
       </div>
     </div>
@@ -118,6 +148,12 @@ const RecentMediaView = () => {
    * @type {[string, Function]}
    */
   const [tautulliBaseUrl, setTautulliBaseUrl] = useState('');
+  
+  /**
+   * Server refresh interval
+   * @type {[number, Function]}
+   */
+  const [refreshInterval, setRefreshInterval] = useState(60000);
 
   /**
    * Fetch configuration when component mounts
@@ -125,9 +161,18 @@ const RecentMediaView = () => {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const response = await fetch('/api/config');
+        const response = await fetch('/api/config', {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
         const data = await response.json();
         setTautulliBaseUrl(data.baseUrl || '');
+        if (data.refreshInterval) {
+          console.log(`Setting refresh interval to ${data.refreshInterval}ms`);
+          setRefreshInterval(data.refreshInterval);
+        }
       } catch (error) {
         console.error('Error fetching configuration:', error);
       }
@@ -145,17 +190,27 @@ const RecentMediaView = () => {
    */
   const fetchMedia = async () => {
     try {
+      console.log('Fetching recent media...');
       const url = new URL('/api/media/recent', window.location.origin);
       if (type) {
         url.searchParams.append('type', type);
       }
       url.searchParams.append('count', RESULTS_PER_SECTION);
 
-      const response = await fetch(url);
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
       if (!response.ok) {
         throw new Error('Failed to fetch media');
       }
-      return await response.json();
+      
+      const data = await response.json();
+      console.log(`Fetched ${data?.response?.data?.length || 0} media items`);
+      return data;
     } catch (error) {
       console.error('Error fetching media:', error);
       throw new Error('Failed to load recent media');
@@ -168,9 +223,39 @@ const RecentMediaView = () => {
   const { 
     data: mediaData, 
     loading, 
-    error, 
-    refresh 
-  } = useBackgroundRefresh(fetchMedia, 300000); // 5 minute refresh interval
+    error,
+    refresh
+  } = useBackgroundRefresh(fetchMedia, refreshInterval);
+  
+  /**
+   * Set up a timer to force refresh data periodically
+   * This ensures we always have the latest data
+   */
+  useEffect(() => {
+    console.log(`Setting up manual refresh timer (${refreshInterval}ms)`);
+    
+    // Force refresh immediately on mount
+    refresh();
+    
+    // Set up a timer to force refresh data
+    const refreshTimer = setInterval(() => {
+      console.log('Manual refresh timer triggered');
+      refresh();
+    }, refreshInterval);
+    
+    return () => {
+      console.log('Cleaning up manual refresh timer');
+      clearInterval(refreshTimer);
+    };
+  }, [refresh, refreshInterval]);
+
+  /**
+   * Force refresh when type changes
+   */
+  useEffect(() => {
+    console.log(`Media type filter changed to: ${type || 'all'}`);
+    refresh();
+  }, [type, refresh]);
 
   /**
    * Map of library section IDs to names
@@ -187,10 +272,10 @@ const RecentMediaView = () => {
    * Group media items by type and section
    */
   const groupedItems = useMemo(() => {
-    if (!mediaData?.response?.data) return { movies: {}, shows: {} };
+    if (!mediaData?.response?.data) return { movies: {}, shows: {}, music: {} };
     
     return mediaData.response.data.reduce((acc, item) => {
-      const mediaType = item.media_type === 'movies' ? 'movies' : 'shows';
+      const mediaType = item.media_type;
       const sectionName = libraryNames[item.section_id] || `Section ${item.section_id}`;
       
       if (!acc[mediaType]) {
@@ -203,7 +288,7 @@ const RecentMediaView = () => {
       
       acc[mediaType][sectionName].push(item);
       return acc;
-    }, { movies: {}, shows: {} });
+    }, { movies: {}, shows: {}, music: {} });
   }, [mediaData, libraryNames]);
 
   return (
@@ -221,24 +306,27 @@ const RecentMediaView = () => {
               onClick={() => setType('movies')}
               className={type === 'movies' ? 'btn-primary' : 'btn-secondary'}
             >
+              <Film className="h-4 w-4 mr-1" />
               Movies
             </button>
             <button
               onClick={() => setType('shows')}
               className={type === 'shows' ? 'btn-primary' : 'btn-secondary'}
             >
+              <Tv className="h-4 w-4 mr-1" />
               TV Shows
             </button>
+            <button
+              onClick={() => setType('music')}
+              className={type === 'music' ? 'btn-primary' : 'btn-secondary'}
+            >
+              <Music className="h-4 w-4 mr-1" />
+              Music
+            </button>
           </div>
-          <button
-            onClick={refresh}
-            className="btn-primary !px-3"
-            disabled={loading}
-            title="Refresh"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            <span className="ml-2">Refresh</span>
-          </button>
+          <div className="text-xs text-gray-400">
+            Auto-refreshes every {Math.round(refreshInterval/1000)} seconds
+          </div>
         </div>
       </div>
 
@@ -248,7 +336,9 @@ const RecentMediaView = () => {
         </div>
       ) : error ? (
         <div className="dark-panel p-8 text-center text-red-400">{error}</div>
-      ) : Object.keys(groupedItems.movies).length === 0 && Object.keys(groupedItems.shows).length === 0 ? (
+      ) : Object.keys(groupedItems.movies).length === 0 && 
+          Object.keys(groupedItems.shows).length === 0 && 
+          Object.keys(groupedItems.music).length === 0 ? (
         <div className="dark-panel p-8 text-center text-gray-400">
           No recent media found
         </div>
@@ -257,7 +347,10 @@ const RecentMediaView = () => {
           {/* Movies Sections */}
           {(type === null || type === 'movies') && Object.keys(groupedItems.movies).length > 0 && (
             <div className="space-y-8">
-              <h2 className="text-xl font-semibold text-white border-b border-white/10 pb-2">Movies</h2>
+              <h2 className="text-xl font-semibold text-white border-b border-white/10 pb-2 flex items-center">
+                <Film className="h-5 w-5 mr-2 text-theme-accent" />
+                Movies
+              </h2>
               {Object.entries(groupedItems.movies).map(([sectionName, items]) => (
                 <MediaSection 
                   key={`movies-${sectionName}`}
@@ -273,12 +366,34 @@ const RecentMediaView = () => {
           {/* TV Shows Sections */}
           {(type === null || type === 'shows') && Object.keys(groupedItems.shows).length > 0 && (
             <div className="space-y-8">
-              <h2 className="text-xl font-semibold text-white border-b border-white/10 pb-2">TV Shows</h2>
+              <h2 className="text-xl font-semibold text-white border-b border-white/10 pb-2 flex items-center">
+                <Tv className="h-5 w-5 mr-2 text-theme-accent" />
+                TV Shows
+              </h2>
               {Object.entries(groupedItems.shows).map(([sectionName, items]) => (
                 <MediaSection 
                   key={`shows-${sectionName}`}
                   title={sectionName}
                   subtitle="Show"
+                  items={items}
+                  tautulliBaseUrl={tautulliBaseUrl}
+                />
+              ))}
+            </div>
+          )}
+          
+          {/* Music Sections */}
+          {(type === null || type === 'music') && Object.keys(groupedItems.music).length > 0 && (
+            <div className="space-y-8">
+              <h2 className="text-xl font-semibold text-white border-b border-white/10 pb-2 flex items-center">
+                <Music className="h-5 w-5 mr-2 text-theme-accent" />
+                Music
+              </h2>
+              {Object.entries(groupedItems.music).map(([sectionName, items]) => (
+                <MediaSection 
+                  key={`music-${sectionName}`}
+                  title={sectionName}
+                  subtitle="Music"
                   items={items}
                   tautulliBaseUrl={tautulliBaseUrl}
                 />

@@ -55,10 +55,27 @@
           "template": "Added ${added_at_relative}"
         }
       ]
+    },
+    "music": {
+      "fields": [
+        {
+          "id": "title",
+          "template": "${parent_title} - ${title}"
+        },
+        {
+          "id": "details",
+          "template": "${year} - ${studio} - ${genres}"
+        },
+        {
+          "id": "added",
+          "template": "Added ${added_at_relative}"
+        }
+      ]
     }
   },
   "sections": {
     "movies": [],
-    "shows": []
+    "shows": [],
+    "music": []
   }
 }

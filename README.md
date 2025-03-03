@@ -1,13 +1,11 @@
 # Tautulli Unified Manager
 
-A comprehensive web application that combines user activity monitoring, media format management, and library statistics for Tautulli. Provides customizable display formats, real-time status tracking, and section management through an intuitive interface with multiple theme options.
-
-![Dashboard Preview](https://github.com/user-attachments/assets/0d8a31e7-59c5-4c19-aa7f-5aa4b9157e82)
+A comprehensive web application that provides a centralized interface for monitoring Plex media server activities through Tautulli. This application combines user activity monitoring, media format management, and library statistics with an intuitive interface featuring multiple theme options and customizable display formats.
 
 ## Features
 
 ### User Activity Management
-- Real-time status updates for currently watching users
+- Real-time status tracking for currently watching users
 - Customizable user status messages and display formats
 - Progress tracking with timestamps and percentages
 - Watch time statistics and play counts
@@ -17,7 +15,7 @@ A comprehensive web application that combines user activity monitoring, media fo
 - Transcode/Direct Play status indicators
 
 ### Media Management
-- Section-based organization for movies and TV shows
+- Section-based organization for movies, TV shows, and music
 - Customizable display formats for each media type
 - Recently added content tracking per section
 - Multiple section support with individual views
@@ -25,21 +23,23 @@ A comprehensive web application that combines user activity monitoring, media fo
 - Individual section statistics and filtering
 
 ### Library Statistics
-- Complete library section overview
+- Complete library section overview with detailed counts
 - Movie count per library section
 - TV show, season, and episode counts
-- Section-specific statistics
-- Sorted by section ID for easy reference
+- Music artist, album, and track counts
+- Section-specific statistics with numerical breakdowns
 - Combined totals for all libraries
+- Configurable display options
 
-### General Features
+### System Features
 - Dark mode responsive UI optimized for all devices
-- Multiple theme options with customizable colors
-- Persistent configuration storage
+- Multiple theme options with customizable transparency settings
 - Real-time updates and live status indicators
-- Docker deployment with volume support
-- Comprehensive API endpoints
+- Persistent configuration storage
+- Comprehensive API endpoints with documentation
 - Homepage integration with YAML configuration generator
+- Docker deployment with volume support
+- Background data refresh with configurable intervals
 
 ## Prerequisites
 
@@ -53,6 +53,7 @@ A comprehensive web application that combines user activity monitoring, media fo
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
 | TAUTULLI_CUSTOM_PORT | Port for the web interface | No | 3010 |
+| TAUTULLI_REFRESH_INTERVAL | Data refresh interval in milliseconds | No | 60000 |
 
 ## Quick Start
 
@@ -73,7 +74,7 @@ services:
     restart: unless-stopped
 ```
 
-Or this if you are having issues getting it to start on linux:
+Alternative configuration for Linux systems:
 
 ```yaml
 version: "3"
@@ -98,6 +99,8 @@ docker compose up -d
 
 3. Access the web interface at `http://localhost:3010`
 
+4. Enter your Tautulli base URL and API key, then select which library sections to include
+
 ## API Endpoints
 
 ### User Management
@@ -112,6 +115,7 @@ POST /api/users/format-settings # Update user format settings
 GET /api/media/recent           # Get recent media from all configured sections
 GET /api/media/recent?type=movies    # Filter by media type
 GET /api/media/recent?type=shows     # Filter by media type
+GET /api/media/recent?type=music     # Filter by music type
 GET /api/media/recent?section=1,2    # Filter by specific section IDs
 GET /api/media/settings              # Get media format settings
 POST /api/media/settings             # Update media format settings
@@ -123,6 +127,7 @@ GET /api/health               # Health check endpoint
 GET /api/config               # Get system configuration
 POST /api/config              # Update system configuration
 POST /api/cache/clear         # Clear system cache
+POST /api/test-connection     # Test Tautulli connection
 ```
 
 ## Display Format Variables
@@ -166,6 +171,17 @@ POST /api/cache/clear         # Clear system cache
 | ${added_at_relative} | Relative time | "2d ago" |
 | ${added_at_short} | Short date | "Feb 10" |
 
+#### Music
+| Variable | Description | Example |
+|----------|-------------|---------|
+| ${parent_title} | Artist name | "Pink Floyd" |
+| ${title} | Album/Track title | "Dark Side of the Moon" |
+| ${year} | Release year | "1973" |
+| ${studio} | Record label/Studio | "Harvest Records" |
+| ${genres} | Music genres | "Progressive Rock" |
+| ${added_at_relative} | Relative time | "2d ago" |
+| ${added_at_short} | Short date | "Feb 10" |
+
 ## Homepage Integration
 
 Tautulli Unified Manager provides built-in configuration generation for the [Homepage](https://gethomepage.dev/) dashboard. The application automatically generates YAML configuration based on your configured sections and formatting preferences.
@@ -181,44 +197,12 @@ Tautulli Unified Manager provides built-in configuration generation for the [Hom
 - Use formatted/raw numbers for statistics
 - Adjust the number of items displayed in each section
 
-### Example Homepage Configuration
-```yaml
-- Activity:                     
-    - Activity:
-         id: list
-         widgets:
-           - type: customapi
-             url: http://192.168.1.100:3010/api/users
-             method: GET
-             display: list
-             mappings:
-               - field:
-                   response:
-                     data:
-                       0: field
-
-- Recently Added:
-    - Movies:
-        icon: mdi-filmstrip
-        id: list
-        widgets:
-          - type: customapi
-            url: http://192.168.1.100:3010/api/media/recent?type=movies&section=1,2
-            method: GET
-            display: list
-            mappings:
-              - field:
-                  response:
-                    data:
-                      0: field
-```
-
 ## Docker Volumes and Configuration
 
 ### Volumes
 - `/app/config`: Persistent configuration storage
-  - `settings.json`: User and media format settings
   - Created automatically on first run
+  - Contains settings.json with format preferences and section configurations
 
 ### Health Checks
 The container includes health checks to monitor:
@@ -241,11 +225,109 @@ Tautulli Unified Manager includes multiple theme options:
 - Midnight (Indigo/Violet)
 - Monochrome (Gray/Slate)
 
-Themes can be changed via the theme switcher in the navigation bar and are persisted between sessions.
+Themes can be changed via the theme switcher in the navigation bar and are persisted between sessions. Each theme also supports customizable transparency settings for UI elements.
+
+## Development
+
+### Project Structure
+```
+Project Folder
+│   Dockerfile
+│   logger.js
+│   package.json
+│   README.md
+│   server.js
+│
+├───backend
+│   ├───api
+│   │       media.js
+│   │       users.js
+│   │
+│   └───services
+│           cacheService.js
+│           settings.js
+│           tautulli.js
+│
+├───config
+│       defaults.json
+│
+└───frontend
+    │   jsconfig.json
+    │   package.json
+    │   postcss.config.js
+    │   tailwind.config.js
+    │
+    ├───public
+    │   │   android-chrome-192x192.png
+    │   │   android-chrome-512x512.png
+    │   │   apple-touch-icon.png
+    │   │   backdrop.jpg
+    │   │   favicon-16x16.png
+    │   │   favicon-32x32.png
+    │   │   favicon.ico
+    │   │   index.html
+    │   │   site.webmanifest
+    │   │
+    │   └───static
+    │           poster-placeholder.jpg
+    │
+    └───src
+        │   App.js
+        │   index.css
+        │   index.js
+        │
+        ├───components
+        │   │   FormatManager.js
+        │   │   ThemeSwitcher.js
+        │   │
+        │   ├───dashboard
+        │   │       LibraryView.js
+        │   │       RecentMediaView.js
+        │   │       UserView.js
+        │   │
+        │   ├───layout
+        │   │       Layout.js
+        │   │
+        │   ├───managers
+        │   │       EndpointsView.js
+        │   │       HomepageConfigManager.js
+        │   │       HomepageView.js
+        │   │       MediaFormatManager.js
+        │   │       SectionManager.js
+        │   │       UnifiedFormatManager.js
+        │   │       UserFormatManager.js
+        │   │
+        │   └───ui
+        │           UIComponents.js
+        │
+        ├───context
+        │       ThemeContext.js
+        │
+        ├───hooks
+        │       useBackgroundRefresh.js
+        │
+        ├───services
+        │       tautulli.js
+        │
+        └───utils
+                utils.js
+```
+
+### Local Development
+1. Clone the repository
+2. Install dependencies:
+```bash
+npm install
+cd frontend && npm install
+```
+3. Start development servers:
+```bash
+npm run dev
+```
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 
 ## Acknowledgments
 

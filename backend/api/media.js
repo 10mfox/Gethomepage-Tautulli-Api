@@ -10,6 +10,9 @@ const { tautulliService } = require('../services/tautulli');
 
 const router = express.Router();
 
+// Enable music-specific debugging
+const DEBUG_MUSIC = true;
+
 // Cache TTLs and keys
 const MEDIA_CACHE_TTL = 300; // 5 minutes
 const RECENT_MEDIA_CACHE_PREFIX = 'recentMedia:';
@@ -130,10 +133,15 @@ function formatItem(item, formatFields) {
   const timestamp = parseInt(item.added_at);
 
   // For TV shows, prioritize the show thumbnail (grandparent) over episode thumbnail
+  // For music, prioritize the artist thumbnail or album art
   let ratingKey;
   if (item.media_type === 'episode' || (item.grandparent_title && item.grandparent_rating_key)) {
     // This is a TV show episode, use the show's rating key
     ratingKey = item.grandparent_rating_key;
+  } else if (item.media_type === 'track' || item.media_type === 'album' || 
+            (item.grandparent_title && item.parent_rating_key)) {
+    // This is a music track or album, use the appropriate rating key
+    ratingKey = item.media_type === 'album' ? item.rating_key : item.parent_rating_key;
   } else {
     // For movies or when grandparent isn't available
     ratingKey = item.rating_key || item.parent_rating_key;
@@ -150,18 +158,34 @@ function formatItem(item, formatFields) {
     added_at_relative: relativeTime
   };
   
+  // Special handling for music items to ensure proper fields are set
+  const isMusicItem = item.media_type === 'track' || 
+                      item.media_type === 'album' || 
+                      item.section_type === 'artist' ||
+                      item.section_type === 'music';
+  
   // Use a pattern-based approach to reduce repeated replacements
   const variableValues = {
     title: item.title || '',
     year: item.year || '',
     grandparent_title: item.grandparent_title || '',
+    parent_title: item.parent_title || '',
     parent_media_index: String(item.parent_media_index || '').padStart(2, '0'),
     media_index: String(item.media_index || '').padStart(2, '0'),
     duration: formattedDuration,
     content_rating: item.content_rating || '',
     video_resolution: item.video_resolution || '',
     added_at_relative: relativeTime,
-    added_at_short: shortDate
+    added_at_short: shortDate,
+    child_count: item.child_count || '0',
+    
+    // Music-specific attributes with enhanced reliability
+    artist: isMusicItem ? (item.grandparent_title || item.parent_title || item.artist || '') : '',
+    album: isMusicItem ? (item.parent_title || item.title || item.album || '') : '',
+    studio: item.studio || '',
+    genres: Array.isArray(item.genres) ? item.genres.join(', ') : (item.genre || ''),
+    rating: item.rating || '',
+    tracks_count: isMusicItem ? (item.child_count || '0') : '0'
   };
 
   // Apply templates
@@ -193,7 +217,7 @@ function formatItem(item, formatFields) {
 async function getLibraryData() {
   try {
     // Check cache first
-    const cachedLibraries = cache.get('libraries');
+    const cachedLibraries = cache.get('libraries', true);
     if (cachedLibraries?.response?.data) {
       const libraryData = await processLibraryData(cachedLibraries.response.data);
       return libraryData;
@@ -212,7 +236,8 @@ async function getLibraryData() {
       sections: [],
       totals: {
         movies: { sections: 0, total_items: 0, total_items_formatted: '0' },
-        shows: { sections: 0, total_items: 0, total_items_formatted: '0', total_seasons: 0, total_seasons_formatted: '0', total_episodes: 0, total_episodes_formatted: '0' }
+        shows: { sections: 0, total_items: 0, total_items_formatted: '0', total_seasons: 0, total_seasons_formatted: '0', total_episodes: 0, total_episodes_formatted: '0' },
+        music: { sections: 0, total_items: 0, total_items_formatted: '0', total_albums: 0, total_albums_formatted: '0', total_tracks: 0, total_tracks_formatted: '0' }
       }
     };
   }
@@ -229,40 +254,64 @@ async function getLibraryData() {
 async function processLibraryData(libraryData) {
   const settings = await getSettings();
   const configuredSections = {
+    shows: settings.sections?.shows || [],
     movies: settings.sections?.movies || [],
-    shows: settings.sections?.shows || []
+    music: settings.sections?.music || []
   };
+
+  if (DEBUG_MUSIC) {
+    console.log('Configured music sections:', configuredSections.music);
+    console.log('Library data sections:', libraryData.map(lib => 
+      `${lib.section_id} (${lib.section_type}): ${lib.section_name}`
+    ));
+  }
 
   // Process sections and mark configured ones
   const sections = libraryData
     .map(library => {
+      // Fix the isConfigured check to ensure proper type conversion
+      const sectionId = parseInt(library.section_id);
       const isConfigured = library.section_type === 'movie' ? 
-        configuredSections.movies.includes(library.section_id) :
+        configuredSections.movies.includes(sectionId) :
         library.section_type === 'show' ? 
-        configuredSections.shows.includes(library.section_id) : 
+        configuredSections.shows.includes(sectionId) : 
+        (library.section_type === 'artist' || library.section_type === 'music') ? 
+        configuredSections.music.includes(sectionId) : 
         false;
+
+      // Ensure parent_count and child_count are properly parsed
+      const parsedParentCount = parseInt(library.parent_count) || 0;
+      const parsedChildCount = parseInt(library.child_count) || 0;
+
+      if (DEBUG_MUSIC && (library.section_type === 'artist' || library.section_type === 'music')) {
+        console.log(`Music library ${library.section_name} (${sectionId}): configured=${isConfigured}`);
+        console.log(`  Artists: ${library.count}, Albums: ${parsedParentCount}, Tracks: ${parsedChildCount}`);
+      }
 
       return {
         section_name: library.section_name,
         section_type: library.section_type,
         count: parseInt(library.count) || 0,
-        section_id: parseInt(library.section_id), // Ensure numeric sorting
+        section_id: sectionId,
         count_formatted: new Intl.NumberFormat().format(parseInt(library.count) || 0),
         configured: isConfigured,
-        ...(library.section_type === 'show' ? {
-          parent_count: parseInt(library.parent_count) || 0,
-          child_count: parseInt(library.child_count) || 0,
-          parent_count_formatted: new Intl.NumberFormat().format(parseInt(library.parent_count) || 0),
-          child_count_formatted: new Intl.NumberFormat().format(parseInt(library.child_count) || 0)
+        ...(library.section_type === 'show' || 
+           library.section_type === 'artist' || 
+           library.section_type === 'music' ? {
+          parent_count: parsedParentCount,
+          child_count: parsedChildCount,
+          parent_count_formatted: new Intl.NumberFormat().format(parsedParentCount),
+          child_count_formatted: new Intl.NumberFormat().format(parsedChildCount)
         } : {})
       };
     })
     .sort((a, b) => a.section_id - b.section_id); // Sort by section ID
 
-  // Calculate totals
+  // Calculate totals with explicit type checking
   const totals = {
     movies: { sections: 0, total_items: 0, total_items_formatted: '0' },
-    shows: { sections: 0, total_items: 0, total_items_formatted: '0', total_seasons: 0, total_seasons_formatted: '0', total_episodes: 0, total_episodes_formatted: '0' }
+    shows: { sections: 0, total_items: 0, total_items_formatted: '0', total_seasons: 0, total_seasons_formatted: '0', total_episodes: 0, total_episodes_formatted: '0' },
+    music: { sections: 0, total_items: 0, total_items_formatted: '0', total_albums: 0, total_albums_formatted: '0', total_tracks: 0, total_tracks_formatted: '0' }
   };
 
   sections.forEach(library => {
@@ -276,6 +325,15 @@ async function processLibraryData(libraryData) {
       totals.shows.total_items += library.count;
       totals.shows.total_seasons += library.parent_count;
       totals.shows.total_episodes += library.child_count;
+    } else if (library.section_type === 'artist' || library.section_type === 'music') {
+      if (DEBUG_MUSIC) {
+        console.log(`Adding to music totals - Section ${library.section_id} (${library.section_name}):`);
+        console.log(`  Artists: ${library.count}, Albums: ${library.parent_count}, Tracks: ${library.child_count}`);
+      }
+      totals.music.sections++;
+      totals.music.total_items += library.count;
+      totals.music.total_albums += library.parent_count;
+      totals.music.total_tracks += library.child_count;
     }
   });
 
@@ -284,6 +342,18 @@ async function processLibraryData(libraryData) {
   totals.shows.total_items_formatted = new Intl.NumberFormat().format(totals.shows.total_items);
   totals.shows.total_seasons_formatted = new Intl.NumberFormat().format(totals.shows.total_seasons);
   totals.shows.total_episodes_formatted = new Intl.NumberFormat().format(totals.shows.total_episodes);
+  totals.music.total_items_formatted = new Intl.NumberFormat().format(totals.music.total_items);
+  totals.music.total_albums_formatted = new Intl.NumberFormat().format(totals.music.total_albums);
+  totals.music.total_tracks_formatted = new Intl.NumberFormat().format(totals.music.total_tracks);
+
+  if (DEBUG_MUSIC) {
+    console.log("Final music totals:", {
+      sections: totals.music.sections,
+      artists: totals.music.total_items_formatted,
+      albums: totals.music.total_albums_formatted, 
+      tracks: totals.music.total_tracks_formatted
+    });
+  }
 
   return { sections, totals };
 }
@@ -295,27 +365,47 @@ cache.registerRefreshCallback('recent_media', async () => {
   const settings = await getSettings();
   const configuredSections = {
     shows: settings.sections?.shows || [],
-    movies: settings.sections?.movies || []
+    movies: settings.sections?.movies || [],
+    music: settings.sections?.music || []
   };
+
+  if (DEBUG_MUSIC) {
+    console.log('Configured sections for refresh:', configuredSections);
+  }
 
   // Fetch each section's recent media in parallel
   const promises = [];
   
-  for (const type of ['shows', 'movies']) {
+  for (const type of ['shows', 'movies', 'music']) {
     for (const sectionId of configuredSections[type]) {
+      // Format section ID consistently
+      const parsedSectionId = parseInt(sectionId);
+      
+      if (DEBUG_MUSIC && type === 'music') {
+        console.log(`Adding promise for music section ${parsedSectionId}`);
+      }
+      
       promises.push(
         tautulliService.makeRequest('get_recently_added', {
-          section_id: sectionId,
+          section_id: parsedSectionId,
           count: 15
-        }).then(response => ({
-          type,
-          sectionId,
-          data: response?.response?.data?.recently_added || []
-        })).catch(error => {
-          console.error(`Error fetching recent media for section ${sectionId}:`, error.message);
+        }).then(response => {
+          const hasItems = response?.response?.data?.recently_added?.length > 0;
+          
+          if (DEBUG_MUSIC && type === 'music') {
+            console.log(`Got ${hasItems ? response.response.data.recently_added.length : 0} items for music section ${parsedSectionId}`);
+          }
+          
           return {
             type,
-            sectionId,
+            sectionId: parsedSectionId,
+            data: response?.response?.data?.recently_added || []
+          };
+        }).catch(error => {
+          console.error(`Error fetching recent media for ${type} section ${parsedSectionId}:`, error.message);
+          return {
+            type,
+            sectionId: parsedSectionId,
             data: []
           };
         })
@@ -324,7 +414,15 @@ cache.registerRefreshCallback('recent_media', async () => {
   }
 
   const results = await Promise.all(promises);
-  return results.filter(result => result.data.length > 0);
+  const filteredResults = results.filter(result => result.data.length > 0);
+  
+  if (DEBUG_MUSIC) {
+    console.log('Music results after refresh:', 
+      filteredResults.filter(r => r.type === 'music')
+        .map(r => `Section ${r.sectionId}: ${r.data.length} items`));
+  }
+  
+  return filteredResults;
 });
 
 /**
@@ -340,7 +438,7 @@ router.get('/settings', async (req, res) => {
     const settings = await getSettings();
     res.json({
       formats: settings.mediaFormats || {},
-      sections: settings.sections || { shows: [], movies: [] }
+      sections: settings.sections || { shows: [], movies: [], music: [] }
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to load media settings' });
@@ -363,13 +461,19 @@ router.post('/settings', async (req, res) => {
     const { sections, formats } = req.body;
     const settings = await getSettings();
 
+    if (DEBUG_MUSIC) {
+      console.log('Saving media settings:');
+      console.log('- Sections:', sections);
+      console.log('- Formats:', formats);
+    }
+
     await saveSettings({
       ...settings,
-      sections: sections || { shows: [], movies: [] },
+      sections: sections || { shows: [], movies: [], music: [] },
       mediaFormats: formats || {}
     });
 
-    // Clear recent media cache to force a refresh with new settings
+    // Clear recent media cache entries
     const keys = cache.keys();
     keys.forEach(key => {
       if (key.startsWith(RECENT_MEDIA_CACHE_PREFIX)) {
@@ -389,7 +493,7 @@ router.post('/settings', async (req, res) => {
  * @route GET /api/media/recent
  * @param {Object} req - Express request object
  * @param {Object} req.query - Query parameters
- * @param {string} [req.query.type] - Filter by media type (movies, shows)
+ * @param {string} [req.query.type] - Filter by media type (movies, shows, music)
  * @param {number} [req.query.count=15] - Number of items to return per section
  * @param {string} [req.query.section] - Comma-separated list of section IDs
  * @param {string} [req.query.fields] - Comma-separated list of fields to include
@@ -400,29 +504,39 @@ router.get('/recent', async (req, res) => {
   try {
     const { type, count = 15, section, fields } = req.query;
     
+    // Force no caching
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    
+    // Enable additional logging for debugging
+    if (DEBUG_MUSIC) {
+      console.log('Media request:', { type, count, section });
+    }
+    
     // Ensure count doesn't exceed max
     const itemCount = Math.min(parseInt(count) || 15, 15);
     
     // Create a unique cache key based on query parameters
     const cacheKey = `${RECENT_MEDIA_CACHE_PREFIX}${type || 'all'}:${itemCount}:${section || 'all'}:${fields || 'all'}`;
     
-    // Check cache first
-    const cachedData = cache.get(cacheKey);
-    if (cachedData) {
-      return res.json(cachedData);
-    }
+    // Clear this key from cache first to ensure fresh data
+    cache.cache.del(cacheKey);
     
-    // Get settings and cached media data
+    // Get settings and cached media data - ALWAYS REFRESH
+    // This ensures we don't use stale data
     const settings = await getSettings();
     const formats = settings.mediaFormats || {};
-    const cachedMedia = cache.get('recent_media');
+    const cachedMedia = cache.get('recent_media', true);
     
     if (!cachedMedia) {
       throw new Error('Media data not available');
     }
 
+    console.log(`Generating fresh media response with ${cachedMedia.length} sections`);
+
     // Determine which types to include
-    const validTypes = ['shows', 'movies'];
+    const validTypes = ['shows', 'movies', 'music'];
     let typesToInclude = type ? 
       type.split(',').filter(t => validTypes.includes(t)) : 
       validTypes;
@@ -453,28 +567,72 @@ router.get('/recent', async (req, res) => {
     for (const mediaType of typesToInclude) {
       const sectionsForType = sectionsToUse[mediaType] || [];
       
+      if (DEBUG_MUSIC && mediaType === 'music') {
+        console.log(`Processing music sections: ${sectionsForType.join(', ')}`);
+        console.log('Available media sections in cache:', 
+          cachedMedia.map(m => `${m.type}-${m.sectionId} (${m.data.length} items)`));
+      }
+      
       for (const sectionId of sectionsForType) {
+        // Find the media for this section in cache with type conversion check
         const sectionMedia = cachedMedia.find(
-          item => item.type === mediaType && item.sectionId === sectionId
+          item => item.type === mediaType && 
+                 (item.sectionId === sectionId || 
+                  parseInt(item.sectionId) === parseInt(sectionId))
         );
         
-        if (!sectionMedia || !sectionMedia.data.length) continue;
+        if (!sectionMedia || !sectionMedia.data.length) {
+          if (DEBUG_MUSIC && mediaType === 'music') {
+            console.log(`No data found for music section ${sectionId}`);
+          }
+          continue;
+        }
         
-        const formatFields = formats[mediaType]?.[sectionId]?.fields || [];
+        // Make sure format fields exist, if not use defaults
+        let formatFields = formats[mediaType]?.[sectionId]?.fields || [];
         
-        // Process each item and add to results
+        // If no format fields exist, check if we need to use a default
+        if (formatFields.length === 0) {
+          if (DEBUG_MUSIC && mediaType === 'music') {
+            console.log(`No format fields for ${mediaType} section ${sectionId}, using default`);
+          }
+          if (mediaType === 'music') {
+            formatFields = [{ id: 'field', template: '${parent_title} - ${title}' }];
+          } else if (mediaType === 'shows') {
+            formatFields = [{ id: 'field', template: '${grandparent_title} - S${parent_media_index}E${media_index} - ${title}' }];
+          } else if (mediaType === 'movies') {
+            formatFields = [{ id: 'field', template: '${title} (${year})' }];
+          }
+        }
+        
+        // Process items with more robustness for music items
         const formattedItems = sectionMedia.data
-          .slice(0, itemCount) // Limit items per section
+          .slice(0, itemCount)
           .map(item => {
-            const formatted = formatItem(item, formatFields);
-            return {
-              ...formatted,
-              added_at: parseInt(item.added_at),
-              media_type: mediaType,
-              section_id: sectionId
-            };
+            try {
+              const formatted = formatItem(item, formatFields);
+              return {
+                ...formatted,
+                added_at: parseInt(item.added_at),
+                media_type: mediaType,
+                section_id: sectionId
+              };
+            } catch (err) {
+              console.error(`Error formatting ${mediaType} item:`, err);
+              // Return a minimal item to avoid breaking the whole response
+              return {
+                field: item.title || 'Unknown Item',
+                added_at: parseInt(item.added_at) || Date.now()/1000,
+                media_type: mediaType,
+                section_id: sectionId
+              };
+            }
           });
           
+        if (DEBUG_MUSIC && mediaType === 'music') {
+          console.log(`Added ${formattedItems.length} music items from section ${sectionId}`);
+        }
+        
         allItems = allItems.concat(formattedItems);
       }
     }
@@ -511,6 +669,7 @@ router.get('/recent', async (req, res) => {
 
     res.json(responseData);
   } catch (error) {
+    console.error('Error in media/recent endpoint:', error);
     res.status(500).json({
       response: {
         result: 'error',

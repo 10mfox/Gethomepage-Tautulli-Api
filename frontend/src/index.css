@@ -386,6 +386,23 @@
   .text-theme-accent {
     color: rgb(var(--accent));
   }
+  
+  /* Standardized media item text layouts */
+  .dark-panel .text-sm.line-clamp-2 {
+    line-height: 1.3;
+    height: 2.6em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .dark-panel .flex.items-center.gap-2.text-xs {
+    height: 1.5em;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
 }
 
 /* Ensure proper z-index layering */
