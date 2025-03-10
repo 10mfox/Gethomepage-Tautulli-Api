@@ -11,8 +11,11 @@ const logger = require('./logger');
 const axios = require('axios');
 const { userRouter } = require('./backend/api/users');
 const { mediaRouter } = require('./backend/api/media');
+const { debugRouter } = require('./backend/api/debug');
 const { initSettings, getSettings, saveSettings } = require('./backend/services/settings');
-const { cache, initializeCache, startBackgroundUpdates } = require('./backend/services/cacheService');
+const { cache, initializeCache } = require('./backend/services/cacheService');
+// Import the fixed startBackgroundRefresh function
+const { startBackgroundRefresh } = require('./backend/services/fix-background-refresh');
 
 /**
  * Gets the local IP address of the server
@@ -34,10 +37,44 @@ function getLocalIpAddress() {
   return '127.0.0.1';
 }
 
+// Request tracking for rate limiting
+const requestTracker = {
+  requests: {},
+  rateLimit: 60, // requests per minute
+  resetInterval: 60000, // 1 minute
+  
+  // Check if a new request is allowed
+  checkLimit(routePath) {
+    const now = Date.now();
+    const minute = Math.floor(now / this.resetInterval);
+    
+    // Create bucket for this minute if not exists
+    if (!this.requests[minute]) {
+      // Clean up old buckets
+      const oldKeys = Object.keys(this.requests).filter(k => parseInt(k) < minute);
+      oldKeys.forEach(k => delete this.requests[k]);
+      
+      // Create new bucket
+      this.requests[minute] = {};
+    }
+    
+    // Check/increment counter for this route
+    const count = this.requests[minute][routePath] || 0;
+    if (count >= this.rateLimit) {
+      return false;
+    }
+    
+    // Increment
+    this.requests[minute][routePath] = count + 1;
+    return true;
+  }
+};
+
 const app = express();
 const PORT = process.env.TAUTULLI_CUSTOM_PORT || 3010;
+// Set to 60 seconds (60000ms)
 const REFRESH_INTERVAL = process.env.TAUTULLI_REFRESH_INTERVAL ? 
-  parseInt(process.env.TAUTULLI_REFRESH_INTERVAL) : 60000;
+  parseInt(process.env.TAUTULLI_REFRESH_INTERVAL) : 60000; // 60 seconds default
 
 // Export for other modules to use
 app.locals.refreshInterval = REFRESH_INTERVAL;
@@ -64,38 +101,44 @@ app.use(compression({
 app.use(express.json());
 
 /**
- * Prevent API caching middleware
- * Ensures API responses aren't cached by browsers or proxies
+ * Rate limiting middleware
+ * Prevents excessive API requests
  */
 app.use((req, res, next) => {
+  // Only apply to API routes
   if (req.path.startsWith('/api/')) {
-    // Prevent caching for all API endpoints
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
+    // Check if request should be allowed
+    if (!requestTracker.checkLimit(req.path)) {
+      // Return 429 Too Many Requests
+      return res.status(429).json({
+        response: {
+          result: 'error',
+          message: 'Too many requests to this endpoint, please try again later'
+        }
+      });
+    }
   }
   next();
 });
 
 /**
  * Cache control middleware
- * Sets appropriate cache headers based on route patterns
+ * Ensures API responses have appropriate caching headers
  */
 app.use((req, res, next) => {
-  // Only apply cache headers to GET requests
-  if (req.method === 'GET') {
-    if (req.path.startsWith('/api/media/recent')) {
-      // Media data can be cached longer
-      res.setHeader('Cache-Control', 'no-cache, max-age=0');
-    } else if (req.path.startsWith('/api/users')) {
-      // User activity changes more frequently
-      res.setHeader('Cache-Control', 'no-cache, max-age=0');
-    } else if (req.path.startsWith('/api/health') || req.path.startsWith('/api/config')) {
-      // Configuration and health checks should not be cached
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-    } else if (req.path.startsWith('/static/')) {
-      // Static assets can be cached longer
-      res.setHeader('Cache-Control', 'public, max-age=86400'); // 1 day
+  if (req.path.startsWith('/api/')) {
+    // For user and media endpoints, use shorter cache time
+    if (req.path.includes('/users') || req.path.includes('/media/recent')) {
+      // Very short caching for frequently refreshed endpoints 
+      res.setHeader('Cache-Control', 'public, max-age=10');
+      
+      // Add ETags for conditional requests
+      res.setHeader('ETag', `W/"${Date.now().toString(36)}"`);
+    } else {
+      // Standard no-cache for other APIs
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
     }
   }
   next();
@@ -114,118 +157,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// API Routes
+// Essential API Routes
 app.use('/api/users', userRouter);
 app.use('/api/media', mediaRouter);
-
-/**
- * Clear cache endpoint
- * 
- * @route POST /api/cache/clear
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @returns {Object} JSON response indicating success or failure
- */
-app.post('/api/cache/clear', (req, res) => {
-  initializeCache()
-    .then(() => res.json({ success: true }))
-    .catch(error => res.status(500).json({ error: error.message }));
-});
-
-/**
- * Force refresh endpoint
- * Forces a cache refresh and returns success status
- * 
- * @route POST /api/force-refresh
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @returns {Object} JSON response indicating success or failure
- */
-app.post('/api/force-refresh', async (req, res) => {
-  try {
-    logger.log('Force refresh requested');
-    await initializeCache();
-    res.json({ success: true, timestamp: new Date().toISOString() });
-  } catch (error) {
-    logger.logError('Force Refresh', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-/**
- * Force refresh specific cache data
- * 
- * @route POST /api/force-refresh/:key
- * @param {Object} req - Express request object
- * @param {Object} req.params - Route parameters
- * @param {string} req.params.key - Cache key to refresh
- * @param {Object} res - Express response object
- * @returns {Object} JSON response indicating success or failure
- */
-app.post('/api/force-refresh/:key', async (req, res) => {
-  try {
-    const { key } = req.params;
-    
-    if (!key || !['users', 'libraries', 'recent_media'].includes(key)) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid or missing cache key' 
-      });
-    }
-    
-    logger.log(`Force refresh requested for ${key}`);
-    const success = await cache.forceUpdate(key);
-    
-    if (success) {
-      res.json({ 
-        success: true, 
-        message: `${key} data refreshed successfully`,
-        timestamp: new Date().toISOString() 
-      });
-    } else {
-      res.status(500).json({ 
-        success: false, 
-        error: `Failed to refresh ${key} data` 
-      });
-    }
-  } catch (error) {
-    logger.logError('Force Refresh', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-/**
- * Get cache statistics endpoint
- * 
- * @route GET /api/cache/stats
- * @param {Object} req - Express request object 
- * @param {Object} res - Express response object
- * @returns {Object} JSON response with cache statistics
- */
-app.get('/api/cache/stats', (req, res) => {
-  const stats = cache.getStats();
-  const hitRate = cache.getHitRate();
-  const lastUpdated = cache.getLastSuccessfulTimestamp();
-  const keys = cache.keys();
-  
-  res.json({
-    keys: keys.length,
-    keyList: keys,
-    hits: stats.hits,
-    misses: stats.misses,
-    hitRate: hitRate.hitRate,
-    lastUpdated: lastUpdated ? new Date(lastUpdated).toISOString() : null
-  });
-});
+app.use('/api/debug', debugRouter);
 
 /**
  * Health check endpoint
  * Verifies Tautulli connection configuration
  * 
  * @route GET /api/health
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @returns {Object} JSON response with health status
  */
 app.get('/api/health', async (req, res) => {
   try {
@@ -275,12 +216,6 @@ app.get('/api/health', async (req, res) => {
  * Verifies connection to Tautulli API server
  * 
  * @route POST /api/test-connection
- * @param {Object} req - Express request object
- * @param {Object} req.body - Request body
- * @param {string} req.body.baseUrl - Tautulli base URL to test
- * @param {string} req.body.apiKey - Tautulli API key to test
- * @param {Object} res - Express response object
- * @returns {Object} JSON response indicating connection success or failure
  */
 app.post('/api/test-connection', async (req, res) => {
   const { baseUrl, apiKey } = req.body;
@@ -334,9 +269,6 @@ app.post('/api/test-connection', async (req, res) => {
  * Returns system configuration including Tautulli settings
  * 
  * @route GET /api/config
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @returns {Object} JSON response with system configuration
  */
 app.get('/api/config', async (req, res) => {
   try {
@@ -344,9 +276,9 @@ app.get('/api/config', async (req, res) => {
     res.json({
       baseUrl: settings.env.TAUTULLI_BASE_URL || '',
       apiKey: settings.env.TAUTULLI_API_KEY || '',
+      homepageIp: settings.env.HOMEPAGE_IP || '', // Add homepage IP
       port: process.env.TAUTULLI_CUSTOM_PORT || 3010,
       refreshInterval: parseInt(process.env.TAUTULLI_REFRESH_INTERVAL || 60000),
-      localIp: getLocalIpAddress(),
       sections: settings.sections || {},
       formats: settings.mediaFormats || {}
     });
@@ -360,16 +292,10 @@ app.get('/api/config', async (req, res) => {
  * Saves Tautulli connection settings
  * 
  * @route POST /api/config
- * @param {Object} req - Express request object
- * @param {Object} req.body - Request body
- * @param {string} req.body.baseUrl - Tautulli base URL
- * @param {string} req.body.apiKey - Tautulli API key
- * @param {Object} res - Express response object
- * @returns {Object} JSON response indicating success or failure
  */
 app.post('/api/config', express.json(), async (req, res) => {
   try {
-    const { baseUrl, apiKey } = req.body;
+    const { baseUrl, apiKey, homepageIp } = req.body;
     
     // Get current settings
     const settings = await getSettings();
@@ -378,7 +304,8 @@ app.post('/api/config', express.json(), async (req, res) => {
     settings.env = {
       ...settings.env,
       TAUTULLI_BASE_URL: baseUrl?.replace(/\/+$/, '') || '',
-      TAUTULLI_API_KEY: apiKey || ''
+      TAUTULLI_API_KEY: apiKey || '',
+      HOMEPAGE_IP: homepageIp || '' // Store the homepage IP
     };
     
     // Save settings to file
@@ -405,8 +332,6 @@ app.use(express.static(path.join(__dirname, 'frontend', 'build'), {
  * Serves the React frontend for all other routes
  * 
  * @route GET *
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
  */
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend', 'build', 'index.html'));
@@ -428,6 +353,7 @@ async function startServer() {
     if (settings.env) {
       process.env.TAUTULLI_BASE_URL = settings.env.TAUTULLI_BASE_URL || '';
       process.env.TAUTULLI_API_KEY = settings.env.TAUTULLI_API_KEY || '';
+      process.env.HOST_IP = settings.env.HOST_IP || '';
     }
 
     // Initialize cache but don't fail if it doesn't succeed
@@ -439,8 +365,8 @@ async function startServer() {
       // Continue server startup
     }
 
-    // Start background updates
-    startBackgroundUpdates();
+    // Start background updates with staggered refresh
+    startBackgroundRefresh();
     
     // Start the server
     app.listen(PORT, () => {

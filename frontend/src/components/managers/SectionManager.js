@@ -36,6 +36,12 @@ const SectionManager = ({ onError, onSuccess }) => {
   });
   
   /**
+   * Homepage IP address for integration
+   * @type {[string, Function]}
+   */
+  const [homepageIp, setHomepageIp] = useState("");
+  
+  /**
    * Available sections from Tautulli
    * @type {[Array<Object>, Function]}
    */
@@ -96,6 +102,23 @@ const SectionManager = ({ onError, onSuccess }) => {
   const [testStartTime, setTestStartTime] = useState(null);
 
   /**
+   * Check if a URL contains an IP address
+   * 
+   * @param {string} url - URL to check
+   * @returns {boolean} True if URL contains an IP address
+   */
+  const isIpAddress = (url) => {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname;
+      // Simple regex to match IPv4 addresses
+      return /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(hostname);
+    } catch (error) {
+      return false;
+    }
+  };
+
+  /**
    * Load data when component mounts
    */
   useEffect(() => {
@@ -125,6 +148,21 @@ const SectionManager = ({ onError, onSuccess }) => {
         TAUTULLI_BASE_URL: configData.baseUrl || '',
         TAUTULLI_API_KEY: configData.apiKey || ''
       });
+      
+      // Set Homepage IP from stored value
+      setHomepageIp(configData.homepageIp || '');
+      
+      // If no homepage IP is stored but URL contains an IP, use that
+      if (!configData.homepageIp && configData.baseUrl) {
+        try {
+          const url = new URL(configData.baseUrl);
+          if (/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(url.hostname)) {
+            setHomepageIp(url.hostname);
+          }
+        } catch (e) {
+          console.error('Error parsing URL:', e);
+        }
+      }
 
       if (mediaData?.response?.libraries?.sections) {
         const available = mediaData.response.libraries.sections.map(library => ({
@@ -132,14 +170,14 @@ const SectionManager = ({ onError, onSuccess }) => {
           name: library.section_name,
           type: library.section_type === 'movie' ? 'movies' : 
                 library.section_type === 'show' ? 'shows' : 
-                library.section_type === 'artist' || library.section_type === 'music' ? 'music' : // Add 'music' as possible identifier
+                library.section_type === 'artist' || library.section_type === 'music' ? 'music' : 
                 'other',
           section_type: library.section_type,
           count: library.count,
           count_formatted: library.count_formatted,
           extra: library.section_type === 'show' || 
                  library.section_type === 'artist' || 
-                 library.section_type === 'music' ? { // Add 'music' type here too
+                 library.section_type === 'music' ? {
             parent_count: library.parent_count_formatted,
             child_count: library.child_count_formatted
           } : null
@@ -348,7 +386,8 @@ const SectionManager = ({ onError, onSuccess }) => {
         },
         body: JSON.stringify({ 
           baseUrl: envVars.TAUTULLI_BASE_URL,
-          apiKey: envVars.TAUTULLI_API_KEY
+          apiKey: envVars.TAUTULLI_API_KEY,
+          homepageIp: homepageIp // Include the homepage IP
         }),
       });
 
@@ -697,6 +736,22 @@ const SectionManager = ({ onError, onSuccess }) => {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <label className="form-label">Homepage Integration IP</label>
+              <input
+                type="text"
+                value={homepageIp}
+                onChange={(e) => setHomepageIp(e.target.value)}
+                placeholder="IP address for Homepage integration (e.g., 192.168.1.100)"
+                className="input-field"
+              />
+              <div className="text-xs text-gray-400">
+                This IP address is required for Homepage YAML configurations.
+                Enter the IP address that Homepage can use to reach this application.
+                If not set, Homepage integration will not work.
+              </div>
+            </div>
+
             {testStatus === 'error' && connectionError && (
               <div className="mt-4 p-3 bg-red-950/30 border border-red-700/50 rounded-lg">
                 <div className="flex items-start gap-2">
@@ -813,6 +868,21 @@ const SectionManager = ({ onError, onSuccess }) => {
               >
                 {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="form-label">Homepage Integration IP</label>
+            <input
+              type="text"
+              value={homepageIp}
+              onChange={(e) => setHomepageIp(e.target.value)}
+              placeholder="IP address for Homepage integration (e.g., 192.168.1.100)"
+              className="input-field"
+            />
+            <div className="text-xs text-gray-400">
+              This IP address will be used exclusively in Homepage YAML configurations.
+              Enter the IP address that Homepage can use to reach this application.
             </div>
           </div>
 

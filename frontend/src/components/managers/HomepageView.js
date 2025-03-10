@@ -4,7 +4,7 @@
  * @module components/managers/HomepageView
  */
 import React, { useState, useEffect } from 'react';
-import { Copy, Check, Monitor, Hash, Layers } from 'lucide-react';
+import { Copy, Check, Monitor, Hash, Layers, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '../ui/UIComponents';
 import { 
   generateActivityYaml, 
@@ -60,7 +60,7 @@ const HomepageView = () => {
   const [baseUrl, setBaseUrl] = useState('');
   
   /**
-   * Local IP address
+   * Homepage IP address
    * @type {[string, Function]}
    */
   const [localIp, setLocalIp] = useState('');
@@ -82,10 +82,10 @@ const HomepageView = () => {
    * @type {[{users: number, movies: number, shows: number, music: number}, Function]}
    */
   const [mappingLengths, setMappingLengths] = useState({
-    users: 15,
-    movies: 15,
-    shows: 15,
-    music: 15
+    users: 1,
+    movies: 1,
+    shows: 1,
+    music: 1
   });
   
   /**
@@ -155,7 +155,7 @@ const HomepageView = () => {
       // Build a clean mapping of library names indexed by section ID
       const names = {};
       const processedSections = { shows: [], movies: [], music: [] };
-
+  
       // Process library sections from the API response
       if (mediaData?.response?.libraries?.sections) {
         mediaData.response.libraries.sections.forEach(library => {
@@ -179,7 +179,7 @@ const HomepageView = () => {
             }
           }
         });
-
+  
         // If we got library data but no processed sections, use settings sections
         if (!processedSections.movies.length && !processedSections.shows.length && !processedSections.music.length) {
           processedSections.movies = (settingsData.sections?.movies || []).map(Number);
@@ -206,9 +206,16 @@ const HomepageView = () => {
         music: settingsData.formats?.music || {}
       });
       setUserFormatFields(userFormatData.fields || []);
+      
+      // Set server configuration values - use the port from the configuration
       setBaseUrl(configData.baseUrl || '');
-      setLocalIp(configData.localIp || '');
+      setLocalIp(configData.homepageIp || '');
       setPort(configData.port || '3010');
+      
+      // Log which IP is being used
+      console.log("Using IP for Homepage YAML:", configData.homepageIp || '');
+      console.log("Using port for Homepage YAML:", configData.port || '3010');
+      
       setLoading(false);
     } catch (error) {
       console.error('Failed to fetch configuration:', error);
@@ -298,7 +305,8 @@ const HomepageView = () => {
   const activityConfig = generateActivityYaml(
     { users: userFormatFields }, 
     mappingLengths, 
-    localIp
+    localIp,
+    port
   );
   
   const recentMediaConfig = generateRecentMediaYaml(
@@ -309,7 +317,8 @@ const HomepageView = () => {
     localIp,
     combineSections,
     showCount,
-    useFormattedNumbers
+    useFormattedNumbers,
+    port
   );
   
   const mediaCountConfig = generateMediaCountYaml(
@@ -317,7 +326,8 @@ const HomepageView = () => {
     libraryNames, 
     localIp, 
     showIndividualCounts, 
-    useFormattedNumbers
+    useFormattedNumbers,
+    port
   );
 
   return (
@@ -476,6 +486,17 @@ const HomepageView = () => {
           URLs are automatically configured using your Tautulli base URL.
         </AlertDescription>
       </Alert>
+
+      {!localIp && (
+        <Alert className="alert alert-warning mb-4">
+          <AlertDescription className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            <span>
+              No Homepage IP set. Please configure the Homepage Integration IP in the Setup tab for Homepage integration to work properly.
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {hasNoSections ? (
         <div className="dark-panel">

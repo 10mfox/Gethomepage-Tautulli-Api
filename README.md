@@ -53,7 +53,6 @@ A comprehensive web application that provides a centralized interface for monito
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
 | TAUTULLI_CUSTOM_PORT | Port for the web interface | No | 3010 |
-| TAUTULLI_REFRESH_INTERVAL | Data refresh interval in milliseconds | No | 60000 |
 
 ## Quick Start
 
@@ -130,57 +129,64 @@ POST /api/cache/clear         # Clear system cache
 POST /api/test-connection     # Test Tautulli connection
 ```
 
+### Debug Interface
+```
+GET /api/debug                # Access debug dashboard
+POST /api/debug/refresh       # Force refresh all cache data
+POST /api/debug/toggle-verbose-logging # Toggle verbose logging
+```
+
 ## Display Format Variables
 
 ### User Format Variables
 | Variable | Description | Example |
 |----------|-------------|---------|
-| ${friendly_name} | User's display name | "John Doe" |
-| ${total_plays} | Total play count | "150" |
-| ${last_played} | Currently watching/last watched | "The Matrix" |
-| ${media_type} | Type of media | "Movie" |
-| ${progress_percent} | Current progress | "45%" |
-| ${progress_time} | Progress timestamp | "1:15:30 / 2:30:00" |
-| ${is_watching} | Current status | "Watching/Idle" |
-| ${last_seen_formatted} | Last activity timestamp | "2 hours ago" |
-| ${stream_container_decision} | Container Steam Type | "Transcode/Direct Play" |
+| ${friendly_name} | User's display name in Plex | "John Doe" |
+| ${total_plays} | Total number of items played by this user | "150" |
+| ${last_played} | Title of content currently watching or last watched | "The Matrix" |
+| ${media_type} | Type of media being played | "Movie", "Episode", "Track" |
+| ${progress_percent} | Current playback progress percentage | "45%" |
+| ${progress_time} | Current playback position and total duration | "1:15:30 / 2:30:00" |
+| ${is_watching} | Current activity status | "Watching", "Paused", "Watched" |
+| ${last_seen_formatted} | Time since last activity with online indicator | "🟢" (online), "2 hours ago" |
+| ${stream_container_decision} | Stream playback method | "transcode", "direct play", "copy" |
 
 ### Media Format Variables
 
 #### Shows
 | Variable | Description | Example |
 |----------|-------------|---------|
-| ${grandparent_title} | Show name | "Breaking Bad" |
-| ${parent_media_index} | Season number | "01" |
-| ${media_index} | Episode number | "05" |
-| ${title} | Episode title | "Gray Matter" |
-| ${duration} | Runtime | "1h 51m" |
-| ${content_rating} | Content Rating | "TV-MA" |
-| ${video_resolution} | Video Quality | "720p" |
-| ${added_at_relative} | Relative time | "2d ago" |
-| ${added_at_short} | Short date | "Feb 10" |
+| ${grandparent_title} | TV show name | "Breaking Bad" |
+| ${parent_media_index} | Season number, zero-padded | "01" |
+| ${media_index} | Episode number, zero-padded | "05" |
+| ${title} | Episode title | "Ozymandias" |
+| ${duration} | Episode runtime | "48m" or "1h 20m" |
+| ${content_rating} | Content rating for the show | "TV-MA" |
+| ${video_resolution} | Video quality/resolution | "1080p", "4K" |
+| ${added_at_relative} | Relative time since addition | "2d ago" |
+| ${added_at_short} | Short date format for addition date | "Feb 10" |
 
 #### Movies
 | Variable | Description | Example |
 |----------|-------------|---------|
 | ${title} | Movie title | "Inception" |
 | ${year} | Release year | "2010" |
-| ${duration} | Runtime | "1h 51m" |
-| ${content_rating} | Content Rating | "PG-13" |
-| ${video_resolution} | Video Quality | "720p" |
-| ${added_at_relative} | Relative time | "2d ago" |
-| ${added_at_short} | Short date | "Feb 10" |
+| ${duration} | Movie runtime | "2h 28m" |
+| ${content_rating} | Content rating | "PG-13", "R" |
+| ${video_resolution} | Video quality/resolution | "1080p", "4K" |
+| ${added_at_relative} | Relative time since addition | "2d ago" |
+| ${added_at_short} | Short date format for addition date | "Feb 10" |
 
 #### Music
 | Variable | Description | Example |
 |----------|-------------|---------|
 | ${parent_title} | Artist name | "Pink Floyd" |
-| ${title} | Album/Track title | "Dark Side of the Moon" |
-| ${year} | Release year | "1973" |
-| ${studio} | Record label/Studio | "Harvest Records" |
-| ${genres} | Music genres | "Progressive Rock" |
-| ${added_at_relative} | Relative time | "2d ago" |
-| ${added_at_short} | Short date | "Feb 10" |
+| ${title} | Album or track title | "Dark Side of the Moon" |
+| ${year} | Release year of the album | "1973" |
+| ${studio} | Record label or studio | "Columbia Records" |
+| ${genres} | Music genre(s) | "Progressive Rock, Psychedelic" |
+| ${added_at_relative} | Relative time since addition | "2d ago" |
+| ${added_at_short} | Short date format for addition date | "Feb 10" |
 
 ## Homepage Integration
 
@@ -196,6 +202,75 @@ Tautulli Unified Manager provides built-in configuration generation for the [Hom
 - Include/exclude count statistics in section views
 - Use formatted/raw numbers for statistics
 - Adjust the number of items displayed in each section
+
+### Integrating Homepage CSS
+
+To improve the appearance of Tautulli widgets in Homepage, you can add custom CSS to your Homepage installation:
+
+1. Copy the CSS below to your Homepage installation's custom CSS file (typically located at `/app/config/custom.css`):
+
+```css
+/*================================== LIST STYLES ==================================*/
+/* Recently Added/Activity Section */
+
+/* Base styles (original) */
+#list > div > div.relative.flex.flex-row.w-full.service-container > div > div {
+  display: block;
+  text-align: right;
+}
+
+#list > div > div.relative.flex.flex-row.w-full.service-container > div > div > div.flex.flex-row.text-right > div:nth-child(1) {
+  text-align: right;
+  margin-left: 0.5rem;
+}
+
+#list > div > div.relative.flex.flex-row.w-full.service-container > div > div > div.flex.flex-row.text-right > div:nth-child(2) {
+  text-align: left;
+  margin-left: auto;
+}
+
+/* Responsive styles for tablets and mobile devices */
+@media screen and (max-width: 768px) {
+  /* Change flex direction for better mobile layout */
+  #list > div > div.relative.flex.flex-row.w-full.service-container {
+    flex-direction: column;
+  }
+  
+  #list > div > div.relative.flex.flex-row.w-full.service-container > div > div {
+    width: 100%;
+    text-align: center;
+    padding: 0.75rem 0;
+  }
+  
+  #list > div > div.relative.flex.flex.row.text-right {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  #list > div > div.relative.flex.flex-row.w-full.service-container > div > div > div.flex.flex-row.text-right > div:nth-child(1) {
+    text-align: center;
+    margin-left: 0;
+  }
+  
+  #list > div > div.relative.flex.flex-row.w-full.service-container > div > div > div.flex.flex-row.text-right > div:nth-child(2) {
+    text-align: center;
+    margin-left: 0;
+  }
+}
+
+/* Extra small devices */
+@media screen and (max-width: 480px) {
+  #list > div > div.relative.flex.flex-row.w-full.service-container > div > div {
+    padding: 0.5rem;
+    font-size: 0.9rem; /* Slightly smaller font for very small screens */
+  }
+}
+```
+
+2. Restart your Homepage container to apply the CSS changes.
+
+3. The CSS improves the display of list items in both the "Recently Added" and "Activity" sections, making them more responsive and mobile-friendly.
 
 ## Docker Volumes and Configuration
 
@@ -225,7 +300,11 @@ Tautulli Unified Manager includes multiple theme options:
 - Midnight (Indigo/Violet)
 - Monochrome (Gray/Slate)
 
-Themes can be changed via the theme switcher in the navigation bar and are persisted between sessions. Each theme also supports customizable transparency settings for UI elements.
+Each theme features customizable transparency settings for:
+- UI elements (panels, navigation, footer)
+- Background overlay opacity
+
+Themes can be changed via the theme switcher in the navigation bar and are persisted between sessions.
 
 ## Development
 
@@ -242,6 +321,7 @@ Project Folder
 │   ├───api
 │   │       media.js
 │   │       users.js
+│   │       debug.js
 │   │
 │   └───services
 │           cacheService.js
@@ -252,24 +332,12 @@ Project Folder
 │       defaults.json
 │
 └───frontend
-    │   jsconfig.json
     │   package.json
-    │   postcss.config.js
     │   tailwind.config.js
     │
     ├───public
-    │   │   android-chrome-192x192.png
-    │   │   android-chrome-512x512.png
-    │   │   apple-touch-icon.png
-    │   │   backdrop.jpg
-    │   │   favicon-16x16.png
-    │   │   favicon-32x32.png
-    │   │   favicon.ico
-    │   │   index.html
-    │   │   site.webmanifest
-    │   │
-    │   └───static
-    │           poster-placeholder.jpg
+    │       index.html
+    │       site.webmanifest
     │
     └───src
         │   App.js
@@ -277,9 +345,6 @@ Project Folder
         │   index.js
         │
         ├───components
-        │   │   FormatManager.js
-        │   │   ThemeSwitcher.js
-        │   │
         │   ├───dashboard
         │   │       LibraryView.js
         │   │       RecentMediaView.js
@@ -291,11 +356,8 @@ Project Folder
         │   ├───managers
         │   │       EndpointsView.js
         │   │       HomepageConfigManager.js
-        │   │       HomepageView.js
-        │   │       MediaFormatManager.js
         │   │       SectionManager.js
         │   │       UnifiedFormatManager.js
-        │   │       UserFormatManager.js
         │   │
         │   └───ui
         │           UIComponents.js
@@ -305,6 +367,7 @@ Project Folder
         │
         ├───hooks
         │       useBackgroundRefresh.js
+        │       useSharedData.js
         │
         ├───services
         │       tautulli.js
@@ -324,6 +387,26 @@ cd frontend && npm install
 ```bash
 npm run dev
 ```
+
+## Performance Features
+
+- Optimized data refresh cycles with 60-second intervals
+- Smart caching with stale-while-revalidate pattern
+- Request deduplication to minimize API calls
+- Conditional requests for bandwidth optimization
+- Background data fetching with progressive enhancement
+- Real-time progress updates for active users
+- Tab visibility-aware refreshing to conserve resources
+
+## Debug Dashboard
+
+Access the debug dashboard at `/api/debug` to:
+- Monitor system health and performance
+- View cache statistics and connection status
+- Manually trigger data refreshes
+- Toggle verbose logging
+- View memory usage and server information
+- Reset settings if needed
 
 ## License
 

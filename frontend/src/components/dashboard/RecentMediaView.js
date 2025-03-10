@@ -3,15 +3,8 @@
  * Displays recently added media items grouped by library section
  * @module components/dashboard/RecentMediaView
  */
-import React, { useState, useMemo, useEffect } from 'react';
-import { Film, Tv, Music } from 'lucide-react';
-import { useBackgroundRefresh } from '../../hooks/useBackgroundRefresh';
-
-/**
- * This dashboard automatically refreshes data based on the server-configured interval
- * No refresh button is needed as data is updated in the background
- * Default refresh interval: 60 seconds (configurable via TAUTULLI_REFRESH_INTERVAL)
- */
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Film, Tv, Music, RefreshCw } from 'lucide-react';
 
 /**
  * Maximum number of results to display per section
@@ -121,7 +114,7 @@ const MediaSection = ({ title, subtitle, items, tautulliBaseUrl }) => {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         {items.map((item, index) => (
           <MediaItem 
-            key={`${item.section_id}-${index}`} 
+            key={`${item.section_id}-${item.added_at}-${index}`}
             item={item} 
             tautulliBaseUrl={tautulliBaseUrl}
           />
@@ -132,7 +125,31 @@ const MediaSection = ({ title, subtitle, items, tautulliBaseUrl }) => {
 };
 
 /**
- * Recent Media dashboard component with section-based layout
+ * Helper function to generate a unique ID for media data to detect changes
+ * 
+ * @param {Array} mediaData - Media data to create fingerprint from
+ * @returns {string} Unique fingerprint string
+ */
+function createMediaFingerprint(mediaData) {
+  if (!mediaData?.response?.data || !Array.isArray(mediaData.response.data)) {
+    return 'empty';
+  }
+  
+  // Create a fingerprint based on item IDs, add times, and lengths
+  const mediaItems = mediaData.response.data;
+  const itemCount = mediaItems.length;
+  
+  // Get the most recent 5 items (or fewer if there aren't enough)
+  const recentItems = mediaItems.slice(0, 5);
+  
+  // Create strings from key properties to detect additions/removals
+  const idString = recentItems.map(item => `${item.section_id}-${item.added_at}`).join(',');
+  
+  return `count:${itemCount}|ids:${idString}`;
+}
+
+/**
+ * Recent Media dashboard component with section-based layout and optimized refresh
  * 
  * @returns {JSX.Element} Rendered component
  */
@@ -144,16 +161,79 @@ const RecentMediaView = () => {
   const [type, setType] = useState(null);
   
   /**
+   * Media data state
+   * @type {[Object|null, Function]} 
+   */
+  const [mediaData, setMediaData] = useState(null);
+  
+  /**
+   * Loading state
+   * @type {[boolean, Function]}
+   */
+  const [loading, setLoading] = useState(true);
+  
+  /**
+   * Error state
+   * @type {[string|null, Function]}
+   */
+  const [error, setError] = useState(null);
+  
+  /**
    * Tautulli base URL for image proxy
    * @type {[string, Function]}
    */
   const [tautulliBaseUrl, setTautulliBaseUrl] = useState('');
   
   /**
-   * Server refresh interval
-   * @type {[number, Function]}
+   * Timestamp of last data update
+   * @type {React.MutableRefObject<number>}
    */
-  const [refreshInterval, setRefreshInterval] = useState(60000);
+  const lastUpdatedRef = useRef(0);
+  
+  /**
+   * Timer reference for refresh interval
+   * @type {React.MutableRefObject<NodeJS.Timeout|null>}
+   */
+  const timerRef = useRef(null);
+  
+  /**
+   * Flag to check if component is mounted
+   * @type {React.MutableRefObject<boolean>}
+   */
+  const isMountedRef = useRef(true);
+  
+  /**
+   * Flag to check if data is being fetched
+   * @type {React.MutableRefObject<boolean>}
+   */
+  const isFetchingRef = useRef(false);
+  
+  /**
+   * Previous type value to detect changes
+   * @type {React.MutableRefObject<string|null>}
+   */
+  const prevTypeRef = useRef(type);
+  
+  /**
+   * Stores the previous media data fingerprint to detect changes
+   * @type {React.MutableRefObject<string>}
+   */
+  const dataFingerprintRef = useRef('');
+
+  /**
+   * Set up cleanup on component unmount
+   */
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    return () => {
+      isMountedRef.current = false;
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, []);
 
   /**
    * Fetch configuration when component mounts
@@ -168,10 +248,8 @@ const RecentMediaView = () => {
           }
         });
         const data = await response.json();
-        setTautulliBaseUrl(data.baseUrl || '');
-        if (data.refreshInterval) {
-          console.log(`Setting refresh interval to ${data.refreshInterval}ms`);
-          setRefreshInterval(data.refreshInterval);
+        if (isMountedRef.current) {
+          setTautulliBaseUrl(data.baseUrl || '');
         }
       } catch (error) {
         console.error('Error fetching configuration:', error);
@@ -182,91 +260,145 @@ const RecentMediaView = () => {
   }, []);
 
   /**
-   * Fetches recent media data from the API
+   * Fetches recent media data from the API with conditional request support
    * 
    * @async
-   * @returns {Promise<Object>} Recent media data
-   * @throws {Error} If fetch fails
+   * @param {boolean} forceRefresh - Whether to force a full refresh
+   * @returns {Promise<void>}
    */
-  const fetchMedia = async () => {
+  const fetchMedia = async (forceRefresh = false) => {
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    
     try {
-      console.log('Fetching recent media...');
+      // Calculate if we need a full refresh or can use a conditional request
+      const typeChanged = type !== prevTypeRef.current;
+      
+      prevTypeRef.current = type;
+      
+      // Set up headers for conditional request
+      const headers = {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      };
+      
+      console.log(`Fetching media data (${forceRefresh || typeChanged ? 'full refresh' : 'conditional'})...`);
+      
+      // Only show loading indicator on first load or type change
+      if (mediaData === null || typeChanged) {
+        setLoading(true);
+      }
+      
       const url = new URL('/api/media/recent', window.location.origin);
       if (type) {
         url.searchParams.append('type', type);
       }
       url.searchParams.append('count', RESULTS_PER_SECTION);
+      
+      // Add a timestamp parameter to prevent browser caching
+      url.searchParams.append('_t', Date.now());
 
-      const response = await fetch(url.toString(), {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
+      const response = await fetch(url.toString(), { headers });
       
       if (!response.ok) {
         throw new Error('Failed to fetch media');
       }
       
       const data = await response.json();
-      console.log(`Fetched ${data?.response?.data?.length || 0} media items`);
-      return data;
+      
+      // Create a fingerprint of the new data to detect actual changes
+      const newFingerprint = createMediaFingerprint(data);
+      const hasChanged = newFingerprint !== dataFingerprintRef.current;
+      
+      // Only update state if the data has actually changed or forced
+      if (hasChanged || forceRefresh || !mediaData) {
+        console.log('Media data has changed, updating view');
+        
+        // Update the fingerprint reference
+        dataFingerprintRef.current = newFingerprint;
+        
+        // Only update state if component is still mounted
+        if (isMountedRef.current) {
+          setMediaData(data);
+          setError(null);
+          setLoading(false);
+          
+          // Update last updated timestamp
+          lastUpdatedRef.current = Date.now();
+          
+          console.log(`Fetched ${data?.response?.data?.length || 0} media items`);
+        }
+      } else {
+        console.log('Media data unchanged, skipping update');
+        setLoading(false);
+      }
     } catch (error) {
       console.error('Error fetching media:', error);
-      throw new Error('Failed to load recent media');
+      if (isMountedRef.current) {
+        setError(error.message || 'Failed to load media data');
+        setLoading(false);
+      }
+    } finally {
+      isFetchingRef.current = false;
     }
   };
 
   /**
-   * Background refresh hook for media data
-   */
-  const { 
-    data: mediaData, 
-    loading, 
-    error,
-    refresh
-  } = useBackgroundRefresh(fetchMedia, refreshInterval);
-  
-  /**
-   * Set up a timer to force refresh data periodically
-   * This ensures we always have the latest data
+   * Set up visibility-based refreshing
+   * Only refresh when the tab is visible and on a reasonable schedule
    */
   useEffect(() => {
-    console.log(`Setting up manual refresh timer (${refreshInterval}ms)`);
+    console.log(`Setting up optimized refresh strategy for media (30 seconds)`);
     
     // Force refresh immediately on mount
-    refresh();
+    fetchMedia(true);
     
-    // Set up a timer to force refresh data
-    const refreshTimer = setInterval(() => {
-      console.log('Manual refresh timer triggered');
-      refresh();
-    }, refreshInterval);
+    // Set up a timer with 30 seconds for media updates 
+    // More frequent than before to catch library changes sooner
+    timerRef.current = setInterval(() => {
+      // Only refresh if the page is visible to the user
+      if (document.visibilityState === 'visible') {
+        console.log('Media data scheduled refresh - page is visible');
+        fetchMedia(false); // Allow change detection
+      } else {
+        console.log('Skipping media refresh - page not visible');
+      }
+    }, 30000); // Refresh every 30 seconds when visible
+    
+    // Add visibility change listener to refresh when user returns to tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('Page became visible, refreshing media data immediately');
+        fetchMedia(true); // Force refresh
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
-      console.log('Cleaning up manual refresh timer');
-      clearInterval(refreshTimer);
+      console.log('Cleaning up media refresh timers');
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [refresh, refreshInterval]);
+  }, []); // Intentionally empty dependency array - we want this to run once
 
   /**
-   * Force refresh when type changes
+   * Refresh when type filter changes
    */
   useEffect(() => {
-    console.log(`Media type filter changed to: ${type || 'all'}`);
-    refresh();
-  }, [type, refresh]);
-
-  /**
-   * Map of library section IDs to names
-   */
-  const libraryNames = useMemo(() => {
-    if (!mediaData?.response?.libraries?.sections) return {};
-    return mediaData.response.libraries.sections.reduce((acc, section) => {
-      acc[section.section_id] = section.section_name;
-      return acc;
-    }, {});
-  }, [mediaData]);
+    const timer = setTimeout(() => {
+      if (type !== prevTypeRef.current) {
+        console.log(`Media type filter changed to: ${type || 'all'}`);
+        fetchMedia(true); // Force refresh on type change
+      }
+    }, 300); // 300ms debounce
+    
+    return () => clearTimeout(timer);
+  }, [type]);
 
   /**
    * Group media items by type and section
@@ -276,7 +408,9 @@ const RecentMediaView = () => {
     
     return mediaData.response.data.reduce((acc, item) => {
       const mediaType = item.media_type;
-      const sectionName = libraryNames[item.section_id] || `Section ${item.section_id}`;
+      const sectionName = mediaData.response.libraries?.sections?.find(
+        section => section.section_id === item.section_id
+      )?.section_name || `Section ${item.section_id}`;
       
       if (!acc[mediaType]) {
         acc[mediaType] = {};
@@ -289,7 +423,15 @@ const RecentMediaView = () => {
       acc[mediaType][sectionName].push(item);
       return acc;
     }, { movies: {}, shows: {}, music: {} });
-  }, [mediaData, libraryNames]);
+  }, [mediaData]);
+
+  /**
+   * Force a manual refresh of the data
+   */
+  const handleManualRefresh = () => {
+    console.log('Manual refresh requested');
+    fetchMedia(true); // Force full refresh
+  };
 
   return (
     <div className="section-spacing">
@@ -324,8 +466,17 @@ const RecentMediaView = () => {
               Music
             </button>
           </div>
-          <div className="text-xs text-gray-400">
-            Auto-refreshes every {Math.round(refreshInterval/1000)} seconds
+          <div className="flex items-center">
+            <div className="text-xs text-gray-400 mr-2">
+              Updates every 30 seconds
+            </div>
+            <button 
+              onClick={handleManualRefresh}
+              className="btn-secondary !py-1 !px-2"
+              title="Refresh now"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
           </div>
         </div>
       </div>

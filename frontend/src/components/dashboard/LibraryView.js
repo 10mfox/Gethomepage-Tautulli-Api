@@ -8,12 +8,6 @@ import { Film, Tv, Music } from 'lucide-react';
 import { useBackgroundRefresh } from '../../hooks/useBackgroundRefresh';
 
 /**
- * This dashboard automatically refreshes data based on the server-configured interval
- * No refresh button is needed as data is updated in the background
- * Default refresh interval: 60 seconds (configurable via TAUTULLI_REFRESH_INTERVAL)
- */
-
-/**
  * Displays library sections with counts and configured status
  * 
  * @returns {JSX.Element} Rendered component
@@ -23,7 +17,7 @@ const LibraryView = () => {
    * Server refresh interval
    * @type {[number, Function]}
    */
-  const [refreshInterval, setRefreshInterval] = useState(60000);
+  const [refreshInterval, setRefreshInterval] = useState(300000); // Increased to 5 minutes
 
   /**
    * Fetch configuration when component mounts
@@ -85,30 +79,55 @@ const LibraryView = () => {
     data: libraryData, 
     loading, 
     error,
-    refresh
+    refresh,
+    lastUpdated
   } = useBackgroundRefresh(fetchLibraries, refreshInterval);
 
   /**
-   * Set up a timer to force refresh data periodically
-   * This ensures we always have the latest data
+   * Set up visibility-based refreshing
+   * Only refresh when the tab is visible and on a reasonable schedule
    */
   useEffect(() => {
-    console.log(`Setting up manual refresh timer (${refreshInterval}ms)`);
+    console.log(`Setting up optimized refresh strategy (${refreshInterval}ms)`);
     
     // Force refresh immediately on mount
     refresh();
     
-    // Set up a timer to force refresh data
+    // Set up a timer with 3x the server interval to reduce frequency
     const refreshTimer = setInterval(() => {
-      console.log('Manual refresh timer triggered');
-      refresh();
-    }, refreshInterval);
+      // Only refresh if the page is visible to the user
+      if (document.visibilityState === 'visible') {
+        console.log('Periodic refresh - page is visible');
+        refresh();
+      } else {
+        console.log('Skipping refresh - page not visible');
+      }
+    }, refreshInterval * 3); // Triple the interval to reduce cache hits
+    
+    // Add visibility change listener to refresh when user returns to tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Check if data is stale (older than refresh interval)
+        const now = Date.now();
+        const timeSinceLastUpdate = now - (lastUpdated || 0);
+        
+        if (timeSinceLastUpdate > refreshInterval) {
+          console.log('Page became visible and data is stale, refreshing');
+          refresh();
+        } else {
+          console.log('Page became visible but data is fresh, not refreshing');
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
-      console.log('Cleaning up manual refresh timer');
+      console.log('Cleaning up refresh timers');
       clearInterval(refreshTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [refresh, refreshInterval]);
+  }, [refresh, refreshInterval, lastUpdated]);
 
   /**
    * Format count display based on library type
@@ -163,7 +182,7 @@ const LibraryView = () => {
             )}
           </div>
           <div className="text-xs text-gray-400">
-            Auto-refreshes every {Math.round(refreshInterval/1000)} seconds
+            Updates every {Math.round(refreshInterval/60000)} minutes
           </div>
         </div>
       </div>

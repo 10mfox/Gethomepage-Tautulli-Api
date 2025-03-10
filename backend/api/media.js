@@ -10,12 +10,32 @@ const { tautulliService } = require('../services/tautulli');
 
 const router = express.Router();
 
-// Enable music-specific debugging
-const DEBUG_MUSIC = true;
+// Enable music-specific debugging only with verbose logging
+const DEBUG_MUSIC = false; // Set to false by default, will check verbose logging state
 
 // Cache TTLs and keys
 const MEDIA_CACHE_TTL = 300; // 5 minutes
 const RECENT_MEDIA_CACHE_PREFIX = 'recentMedia:';
+
+/**
+ * Check if verbose logging is enabled
+ * 
+ * @returns {boolean} True if verbose logging is enabled
+ */
+function isVerboseLoggingEnabled() {
+  return cache.isVerboseLoggingEnabled();
+}
+
+/**
+ * Log message only when verbose logging is enabled
+ * 
+ * @param {string} message - Message to log
+ */
+function verboseLog(message) {
+  if (isVerboseLoggingEnabled()) {
+    console.log(message);
+  }
+}
 
 /**
  * Format duration from Plex runtime to human readable string
@@ -259,11 +279,11 @@ async function processLibraryData(libraryData) {
     music: settings.sections?.music || []
   };
 
-  if (DEBUG_MUSIC) {
-    console.log('Configured music sections:', configuredSections.music);
-    console.log('Library data sections:', libraryData.map(lib => 
+  if (DEBUG_MUSIC && isVerboseLoggingEnabled()) {
+    verboseLog('Configured music sections: ' + JSON.stringify(configuredSections.music));
+    verboseLog('Library data sections: ' + JSON.stringify(libraryData.map(lib => 
       `${lib.section_id} (${lib.section_type}): ${lib.section_name}`
-    ));
+    )));
   }
 
   // Process sections and mark configured ones
@@ -283,9 +303,9 @@ async function processLibraryData(libraryData) {
       const parsedParentCount = parseInt(library.parent_count) || 0;
       const parsedChildCount = parseInt(library.child_count) || 0;
 
-      if (DEBUG_MUSIC && (library.section_type === 'artist' || library.section_type === 'music')) {
-        console.log(`Music library ${library.section_name} (${sectionId}): configured=${isConfigured}`);
-        console.log(`  Artists: ${library.count}, Albums: ${parsedParentCount}, Tracks: ${parsedChildCount}`);
+      if (DEBUG_MUSIC && isVerboseLoggingEnabled() && (library.section_type === 'artist' || library.section_type === 'music')) {
+        verboseLog(`Music library ${library.section_name} (${sectionId}): configured=${isConfigured}`);
+        verboseLog(`  Artists: ${library.count}, Albums: ${parsedParentCount}, Tracks: ${parsedChildCount}`);
       }
 
       return {
@@ -326,9 +346,9 @@ async function processLibraryData(libraryData) {
       totals.shows.total_seasons += library.parent_count;
       totals.shows.total_episodes += library.child_count;
     } else if (library.section_type === 'artist' || library.section_type === 'music') {
-      if (DEBUG_MUSIC) {
-        console.log(`Adding to music totals - Section ${library.section_id} (${library.section_name}):`);
-        console.log(`  Artists: ${library.count}, Albums: ${library.parent_count}, Tracks: ${library.child_count}`);
+      if (DEBUG_MUSIC && isVerboseLoggingEnabled()) {
+        verboseLog(`Adding to music totals - Section ${library.section_id} (${library.section_name}):`);
+        verboseLog(`  Artists: ${library.count}, Albums: ${library.parent_count}, Tracks: ${library.child_count}`);
       }
       totals.music.sections++;
       totals.music.total_items += library.count;
@@ -346,13 +366,13 @@ async function processLibraryData(libraryData) {
   totals.music.total_albums_formatted = new Intl.NumberFormat().format(totals.music.total_albums);
   totals.music.total_tracks_formatted = new Intl.NumberFormat().format(totals.music.total_tracks);
 
-  if (DEBUG_MUSIC) {
-    console.log("Final music totals:", {
+  if (DEBUG_MUSIC && isVerboseLoggingEnabled()) {
+    verboseLog("Final music totals: " + JSON.stringify({
       sections: totals.music.sections,
       artists: totals.music.total_items_formatted,
       albums: totals.music.total_albums_formatted, 
       tracks: totals.music.total_tracks_formatted
-    });
+    }));
   }
 
   return { sections, totals };
@@ -369,8 +389,8 @@ cache.registerRefreshCallback('recent_media', async () => {
     music: settings.sections?.music || []
   };
 
-  if (DEBUG_MUSIC) {
-    console.log('Configured sections for refresh:', configuredSections);
+  if (DEBUG_MUSIC && isVerboseLoggingEnabled()) {
+    verboseLog('Configured sections for refresh: ' + JSON.stringify(configuredSections));
   }
 
   // Fetch each section's recent media in parallel
@@ -381,8 +401,8 @@ cache.registerRefreshCallback('recent_media', async () => {
       // Format section ID consistently
       const parsedSectionId = parseInt(sectionId);
       
-      if (DEBUG_MUSIC && type === 'music') {
-        console.log(`Adding promise for music section ${parsedSectionId}`);
+      if (DEBUG_MUSIC && isVerboseLoggingEnabled() && type === 'music') {
+        verboseLog(`Adding promise for music section ${parsedSectionId}`);
       }
       
       promises.push(
@@ -392,8 +412,8 @@ cache.registerRefreshCallback('recent_media', async () => {
         }).then(response => {
           const hasItems = response?.response?.data?.recently_added?.length > 0;
           
-          if (DEBUG_MUSIC && type === 'music') {
-            console.log(`Got ${hasItems ? response.response.data.recently_added.length : 0} items for music section ${parsedSectionId}`);
+          if (DEBUG_MUSIC && isVerboseLoggingEnabled() && type === 'music') {
+            verboseLog(`Got ${hasItems ? response.response.data.recently_added.length : 0} items for music section ${parsedSectionId}`);
           }
           
           return {
@@ -416,10 +436,10 @@ cache.registerRefreshCallback('recent_media', async () => {
   const results = await Promise.all(promises);
   const filteredResults = results.filter(result => result.data.length > 0);
   
-  if (DEBUG_MUSIC) {
-    console.log('Music results after refresh:', 
-      filteredResults.filter(r => r.type === 'music')
-        .map(r => `Section ${r.sectionId}: ${r.data.length} items`));
+  if (DEBUG_MUSIC && isVerboseLoggingEnabled()) {
+    verboseLog('Music results after refresh: ' + 
+      JSON.stringify(filteredResults.filter(r => r.type === 'music')
+        .map(r => `Section ${r.sectionId}: ${r.data.length} items`)));
   }
   
   return filteredResults;
@@ -461,10 +481,10 @@ router.post('/settings', async (req, res) => {
     const { sections, formats } = req.body;
     const settings = await getSettings();
 
-    if (DEBUG_MUSIC) {
-      console.log('Saving media settings:');
-      console.log('- Sections:', sections);
-      console.log('- Formats:', formats);
+    if (DEBUG_MUSIC && isVerboseLoggingEnabled()) {
+      verboseLog('Saving media settings:');
+      verboseLog('- Sections: ' + JSON.stringify(sections));
+      verboseLog('- Formats: ' + JSON.stringify(formats));
     }
 
     await saveSettings({
@@ -509,9 +529,9 @@ router.get('/recent', async (req, res) => {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     
-    // Enable additional logging for debugging
-    if (DEBUG_MUSIC) {
-      console.log('Media request:', { type, count, section });
+    // Enable additional logging for debugging only if verbose logging is enabled
+    if (isVerboseLoggingEnabled()) {
+      verboseLog('Media request: ' + JSON.stringify({ type, count, section }));
     }
     
     // Ensure count doesn't exceed max
@@ -523,17 +543,33 @@ router.get('/recent', async (req, res) => {
     // Clear this key from cache first to ensure fresh data
     cache.cache.del(cacheKey);
     
-    // Get settings and cached media data - ALWAYS REFRESH
-    // This ensures we don't use stale data
+    // Get settings and cached media data
     const settings = await getSettings();
     const formats = settings.mediaFormats || {};
-    const cachedMedia = cache.get('recent_media', true);
     
-    if (!cachedMedia) {
-      throw new Error('Media data not available');
+    // Try to get media data from cache
+    const mediaData = cache.get('recent_media', true);
+    
+    // If media data isn't available yet, try to fetch directly or return empty response
+    if (!mediaData) {
+      if (isVerboseLoggingEnabled()) {
+        verboseLog('Media data not found in cache, returning empty response');
+      }
+      
+      // Return a friendly "loading" response instead of an error
+      return res.json({
+        response: {
+          result: 'loading',
+          message: 'Media data is being loaded, please try again in a moment',
+          data: [],
+          libraries: await getLibraryData() // Still try to get library data if possible
+        }
+      });
     }
 
-    console.log(`Generating fresh media response with ${cachedMedia.length} sections`);
+    if (isVerboseLoggingEnabled()) {
+      verboseLog(`Generating fresh media response with ${mediaData.length} sections`);
+    }
 
     // Determine which types to include
     const validTypes = ['shows', 'movies', 'music'];
@@ -567,23 +603,23 @@ router.get('/recent', async (req, res) => {
     for (const mediaType of typesToInclude) {
       const sectionsForType = sectionsToUse[mediaType] || [];
       
-      if (DEBUG_MUSIC && mediaType === 'music') {
-        console.log(`Processing music sections: ${sectionsForType.join(', ')}`);
-        console.log('Available media sections in cache:', 
-          cachedMedia.map(m => `${m.type}-${m.sectionId} (${m.data.length} items)`));
+      if (DEBUG_MUSIC && isVerboseLoggingEnabled() && mediaType === 'music') {
+        verboseLog(`Processing music sections: ${sectionsForType.join(', ')}`);
+        verboseLog('Available media sections in cache: ' + 
+          JSON.stringify(mediaData.map(m => `${m.type}-${m.sectionId} (${m.data.length} items)`)));
       }
       
       for (const sectionId of sectionsForType) {
         // Find the media for this section in cache with type conversion check
-        const sectionMedia = cachedMedia.find(
+        const sectionMedia = mediaData.find(
           item => item.type === mediaType && 
                  (item.sectionId === sectionId || 
                   parseInt(item.sectionId) === parseInt(sectionId))
         );
         
         if (!sectionMedia || !sectionMedia.data.length) {
-          if (DEBUG_MUSIC && mediaType === 'music') {
-            console.log(`No data found for music section ${sectionId}`);
+          if (DEBUG_MUSIC && isVerboseLoggingEnabled() && mediaType === 'music') {
+            verboseLog(`No data found for music section ${sectionId}`);
           }
           continue;
         }
@@ -593,8 +629,8 @@ router.get('/recent', async (req, res) => {
         
         // If no format fields exist, check if we need to use a default
         if (formatFields.length === 0) {
-          if (DEBUG_MUSIC && mediaType === 'music') {
-            console.log(`No format fields for ${mediaType} section ${sectionId}, using default`);
+          if (DEBUG_MUSIC && isVerboseLoggingEnabled() && mediaType === 'music') {
+            verboseLog(`No format fields for ${mediaType} section ${sectionId}, using default`);
           }
           if (mediaType === 'music') {
             formatFields = [{ id: 'field', template: '${parent_title} - ${title}' }];
@@ -629,8 +665,8 @@ router.get('/recent', async (req, res) => {
             }
           });
           
-        if (DEBUG_MUSIC && mediaType === 'music') {
-          console.log(`Added ${formattedItems.length} music items from section ${sectionId}`);
+        if (DEBUG_MUSIC && isVerboseLoggingEnabled() && mediaType === 'music') {
+          verboseLog(`Added ${formattedItems.length} music items from section ${sectionId}`);
         }
         
         allItems = allItems.concat(formattedItems);

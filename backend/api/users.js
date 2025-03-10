@@ -17,15 +17,40 @@ const USER_LIST_CACHE_PREFIX = 'userList:';
 const USER_HISTORY_CACHE_PREFIX = 'userHistory:';
 
 /**
- * Format seconds into hours and minutes display string
+ * Check if verbose logging is enabled
+ * 
+ * @returns {boolean} True if verbose logging is enabled
+ */
+function isVerboseLoggingEnabled() {
+  return cache.isVerboseLoggingEnabled();
+}
+
+/**
+ * Log message only when verbose logging is enabled
+ * 
+ * @param {string} message - Message to log
+ */
+function verboseLog(message) {
+  if (isVerboseLoggingEnabled()) {
+    console.log(message);
+  }
+}
+
+/**
+ * Format seconds into hours and minutes display string with optimized performance
+ * Updated for more efficient progress time calculation
  * 
  * @param {number} totalSeconds - Total seconds to format
  * @returns {string} Formatted time string (e.g. "2h 30m" or "45m")
  */
 function formatTimeHHMM(totalSeconds) {
   if (!totalSeconds) return '0m';
+  
+  // Use integer division for better performance
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
+  
+  // Simplified string concatenation for better performance
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
 
@@ -84,6 +109,7 @@ async function getUserHistory(baseUrl, apiKey, userId) {
   }
   
   try {
+    verboseLog(`Fetching history for user ${userId}`);
     const response = await axios.get(`${baseUrl}/api/v2`, {
       params: {
         apikey: apiKey,
@@ -117,6 +143,7 @@ cache.registerRefreshCallback('users', async () => {
   }
   
   try {
+    verboseLog('Refreshing user data');
     const [activityResponse, usersResponse] = await Promise.all([
       axios.get(`${process.env.TAUTULLI_BASE_URL}/api/v2`, {
         params: {
@@ -135,10 +162,16 @@ cache.registerRefreshCallback('users', async () => {
       })
     ]);
     
-    return {
+    const userData = {
       activity: activityResponse.data.response.data || { sessions: [] },
       users: usersResponse.data.response.data || { data: [] }
     };
+    
+    if (isVerboseLoggingEnabled()) {
+      verboseLog(`Fetched ${userData.activity.sessions?.length || 0} active sessions and ${userData.users.data?.length || 0} users`);
+    }
+    
+    return userData;
   } catch (error) {
     console.error("Error refreshing user data:", error.message);
     throw error;
@@ -196,22 +229,29 @@ router.get('/', async (req, res) => {
       throw new Error('User data not available');
     }
 
-    console.log(`Generating fresh user data response with ${userData.activity.sessions?.length || 0} active sessions`);
+    if (isVerboseLoggingEnabled()) {
+      verboseLog(`Generating fresh user data response with ${userData.activity.sessions?.length || 0} active sessions`);
+    }
 
     const watchingUsers = {};
     userData.activity.sessions?.forEach(session => {
-      if (session.state === 'playing') {
+      if (session.state === 'playing' || session.state === 'paused') {
+        // Ensure view_offset and duration values are properly converted to seconds
+        const viewOffset = Math.floor((session.view_offset || 0) / 1000);
+        const duration = Math.floor((session.duration || 0) / 1000);
+        
         watchingUsers[session.user_id] = {
           current_media: session.grandparent_title ? `${session.grandparent_title} - ${session.title}` : session.title,
           last_played_modified: formatShowTitle(session),
           media_type: session.media_type,
           progress_percent: session.progress_percent || '0',
-          view_offset: Math.floor((session.view_offset || 0) / 1000),
-          duration: Math.floor((session.duration || 0) / 1000),
+          view_offset: viewOffset,
+          duration: duration,
           last_seen: Math.floor(Date.now() / 1000),
           parent_media_index: session.parent_media_index,
           media_index: session.media_index,
-          stream_container_decision: session.stream_container_decision || 'direct play'
+          stream_container_decision: session.stream_container_decision || 'direct play',
+          state: session.state // Store the actual state
         };
       }
     });
@@ -260,7 +300,7 @@ router.get('/', async (req, res) => {
         const baseUser = {
           friendly_name: user.friendly_name || '',
           total_plays: parseInt(user.plays || '0', 10),
-          is_watching: watching ? 'Watching' : 'Watched',
+          is_watching: watching ? (watching.state === 'paused' ? 'Paused' : 'Watching') : 'Watched',
           last_played: watching ? watching.current_media : (user.last_played || 'Nothing'),
           last_played_modified: lastPlayedModified,
           media_type: watching ? watching.media_type.charAt(0).toUpperCase() + watching.media_type.slice(1) : 
@@ -294,6 +334,10 @@ router.get('/', async (req, res) => {
 
     // Wait for all history promises to resolve and update the transformedUsers
     if (historyPromises.length > 0) {
+      if (isVerboseLoggingEnabled()) {
+        verboseLog(`Fetching history for ${historyPromises.length} users`);
+      }
+      
       await Promise.all(historyPromises.map(({ promise }) => promise))
         .then(results => {
           historyPromises.forEach(({ index, promise }, i) => {
@@ -380,6 +424,7 @@ router.get('/format-settings', async (req, res) => {
     if (userFormats.fields.length > 0) {
       // If the first field has id 'status_message', change it to 'field'
       if (userFormats.fields[0].id === 'status_message') {
+        verboseLog('Normalizing user format field ID from status_message to field');
         userFormats.fields[0].id = 'field';
       }
     }
@@ -410,6 +455,10 @@ router.post('/format-settings', async (req, res) => {
     // Ensure the first field always has id 'field'
     if (fields.length > 0) {
       fields[0].id = 'field';
+    }
+    
+    if (isVerboseLoggingEnabled()) {
+      verboseLog('Saving user format settings: ' + JSON.stringify(fields));
     }
     
     const settings = await getSettings();

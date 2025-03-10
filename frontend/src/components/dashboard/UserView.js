@@ -3,18 +3,11 @@
  * Displays user activity with pagination and search
  * @module components/dashboard/UserView
  */
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useBackgroundRefresh } from '../../hooks/useBackgroundRefresh';
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 
 /**
- * This dashboard automatically refreshes data based on the server-configured interval
- * No refresh button is needed as data is updated in the background
- * Default refresh interval: 60 seconds (configurable via TAUTULLI_REFRESH_INTERVAL)
- */
-
-/**
- * User Activity dashboard component
+ * User Activity dashboard component with optimized refresh strategy
  * 
  * @returns {JSX.Element} Rendered component
  */
@@ -26,10 +19,34 @@ const UserView = () => {
   const [formatFields, setFormatFields] = useState([]);
   
   /**
+   * User data state
+   * @type {[Array, Function]}
+   */
+  const [users, setUsers] = useState(null);
+  
+  /**
+   * Loading state
+   * @type {[boolean, Function]}
+   */
+  const [loading, setLoading] = useState(true);
+  
+  /**
+   * Error state
+   * @type {[string|null, Function]}
+   */
+  const [error, setError] = useState(null);
+  
+  /**
    * Search query for filtering users
    * @type {[string, Function]}
    */
   const [search, setSearch] = useState('');
+  
+  /**
+   * Cached search query to detect actual changes
+   * @type {[string, Function]}
+   */
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   
   /**
    * Current page number (zero-based)
@@ -50,51 +67,68 @@ const UserView = () => {
   const [totalRecords, setTotalRecords] = useState(0);
   
   /**
-   * Server refresh interval
-   * @type {[number, Function]}
+   * Timestamp of last data update
+   * @type {React.MutableRefObject<number>}
    */
-  const [refreshInterval, setRefreshInterval] = useState(60000);
+  const lastUpdatedRef = useRef(0);
+  
+  /**
+   * Timer reference for refresh interval
+   * @type {React.MutableRefObject<NodeJS.Timeout|null>}
+   */
+  const timerRef = useRef(null);
+  
+  /**
+   * Flag to check if component is mounted
+   * @type {React.MutableRefObject<boolean>}
+   */
+  const isMountedRef = useRef(true);
+  
+  /**
+   * Flag to check if data is being fetched
+   * @type {React.MutableRefObject<boolean>}
+   */
+  const isFetchingRef = useRef(false);
 
   /**
-   * Fetch configuration when component mounts
+   * Set up cleanup on component unmount
    */
   useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const response = await fetch('/api/config', {
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        });
-        const data = await response.json();
-        if (data.refreshInterval) {
-          console.log(`Setting refresh interval to ${data.refreshInterval}ms`);
-          setRefreshInterval(data.refreshInterval);
-        }
-      } catch (error) {
-        console.error('Error fetching configuration:', error);
+    isMountedRef.current = true;
+    
+    return () => {
+      isMountedRef.current = false;
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
     };
-    
-    fetchConfig();
   }, []);
 
   /**
-   * Fetches user data from the API
+   * Fetches user data from the API with conditional request support
    * 
    * @async
-   * @returns {Promise<Array>} Array of user objects
+   * @returns {Promise<void>}
    */
   const fetchUsers = async () => {
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    
     try {
+      // Set up headers for conditional request
+      const headers = {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      };
+      
       console.log('Fetching user data...');
+      setLoading(users === null); // Only show loading on first load
+      
       const [usersResponse, formatResponse] = await Promise.all([
-        fetch(`/api/users?start=${page * pageSize}&length=${pageSize}&search=${search}`, {
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
+        fetch(`/api/users?start=${page * pageSize}&length=${pageSize}&search=${debouncedSearch}`, {
+          headers
         }),
         fetch('/api/users/format-settings', {
           headers: {
@@ -111,63 +145,100 @@ const UserView = () => {
       const userData = await usersResponse.json();
       const formatData = await formatResponse.json();
       
-      // Ensure consistent field IDs
-      const fields = formatData.fields || [];
-      if (fields.length > 0 && fields[0].id !== 'field') {
-        fields[0].id = 'field';
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        // Ensure consistent field IDs
+        const fields = formatData.fields || [];
+        if (fields.length > 0 && fields[0].id !== 'field') {
+          fields[0].id = 'field';
+        }
+        
+        setFormatFields(fields);
+        setUsers(userData.response?.data || []);
+        setTotalRecords(userData.response?.recordsTotal || 0);
+        setError(null);
+        
+        // Update last updated timestamp
+        lastUpdatedRef.current = Date.now();
+        
+        console.log(`Fetched ${userData.response?.data?.length || 0} users`);
       }
-      
-      setFormatFields(fields);
-      setTotalRecords(userData.response?.recordsTotal || 0);
-      
-      console.log(`Fetched ${userData.response?.data?.length || 0} users`);
-      
-      return userData.response?.data || [];
     } catch (error) {
       console.error('Error fetching user data:', error);
-      throw error;
+      if (isMountedRef.current) {
+        setError(error.message || 'Failed to load users');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+      isFetchingRef.current = false;
     }
   };
-
-  /**
-   * Background refresh hook for user data
-   */
-  const { 
-    data: users, 
-    loading, 
-    error,
-    refresh
-  } = useBackgroundRefresh(fetchUsers, refreshInterval);
   
   /**
-   * Set up a timer to force refresh data periodically
-   * This ensures we always have the latest data
+   * Debounce search input to reduce API calls
    */
   useEffect(() => {
-    console.log(`Setting up manual refresh timer (${refreshInterval}ms)`);
+    const timer = setTimeout(() => {
+      if (search !== debouncedSearch) {
+        console.log(`Search term changed from "${debouncedSearch}" to "${search}"`);
+        setDebouncedSearch(search);
+      }
+    }, 500); // 500ms debounce
+    
+    return () => clearTimeout(timer);
+  }, [search, debouncedSearch]);
+  
+  /**
+   * Set up visibility-based refreshing
+   * Only refresh when the tab is visible and on a reasonable schedule
+   */
+  useEffect(() => {
+    console.log(`Setting up optimized refresh strategy for users (60 seconds)`);
     
     // Force refresh immediately on mount
-    refresh();
+    fetchUsers();
     
-    // Set up a timer to force refresh data
-    const refreshTimer = setInterval(() => {
-      console.log('Manual refresh timer triggered');
-      refresh();
-    }, refreshInterval);
+    // Set up a timer with exactly 60 seconds for users
+    timerRef.current = setInterval(() => {
+      // Only refresh if the page is visible to the user
+      if (document.visibilityState === 'visible') {
+        // Always refresh regardless of how recent the data is
+        console.log('User data scheduled refresh - page is visible');
+        fetchUsers();
+      } else {
+        console.log('Skipping user refresh - page not visible');
+      }
+    }, 60000); // Refresh exactly every 60 seconds when visible
+    
+    // Add visibility change listener to refresh when user returns to tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('Page became visible, refreshing user data immediately');
+        fetchUsers();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
-      console.log('Cleaning up manual refresh timer');
-      clearInterval(refreshTimer);
+      console.log('Cleaning up user refresh timers');
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [refresh, refreshInterval]);
+  }, []); // Intentionally empty dependency array - we want this to run once
 
   /**
    * Force refresh when pagination or search changes
    */
   useEffect(() => {
-    console.log(`Page or search changed: page=${page}, search=${search}`);
-    refresh();
-  }, [page, pageSize, search, refresh]);
+    console.log(`Parameters changed: page=${page}, search=${debouncedSearch}`);
+    fetchUsers();
+  }, [page, pageSize, debouncedSearch]);
 
   const totalPages = Math.ceil(totalRecords / pageSize);
 
@@ -220,6 +291,14 @@ const UserView = () => {
     return index === 0 ? 'field' : field.id;
   };
 
+  /**
+   * Force a manual refresh of the data
+   */
+  const handleManualRefresh = () => {
+    console.log('Manual refresh requested');
+    fetchUsers();
+  };
+
   return (
     <div className="section-spacing">
       <div className="dark-panel">
@@ -231,7 +310,6 @@ const UserView = () => {
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
-                setPage(0);
               }}
               className="input-field w-64"
             />
@@ -247,8 +325,17 @@ const UserView = () => {
               <option value="50">50 per page</option>
               <option value="100">100 per page</option>
             </select>
-            <div className="text-xs text-gray-400">
-              Auto-refreshes every {Math.round(refreshInterval/1000)} seconds
+            <div className="flex items-center">
+              <div className="text-xs text-gray-400 mr-2">
+                Updates every 60 seconds
+              </div>
+              <button 
+                onClick={handleManualRefresh}
+                className="btn-secondary !py-1 !px-2"
+                title="Refresh now"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </button>
             </div>
           </div>
         </div>

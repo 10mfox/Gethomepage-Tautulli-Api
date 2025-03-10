@@ -204,48 +204,50 @@ function extractSectionId(section) {
 
 /**
  * Template variables by format type
+ * Comprehensive descriptions of all available variables for formatting templates
  * @type {Object}
  */
 export const variables = {
   user: [
-    { code: '${friendly_name}', description: 'Display name' },
-    { code: '${total_plays}', description: 'Total play count' },
-    { code: '${last_played}', description: 'Currently watching/last watched' },
-    { code: '${media_type}', description: 'Type of media' },
-    { code: '${progress_percent}', description: 'Current progress' },
-    { code: '${progress_time}', description: 'Progress timestamp' },
-    { code: '${is_watching}', description: 'Current status' },
-    { code: '${last_seen_formatted}', description: 'Last activity timestamp' },
-    { code: '${stream_container_decision}', description: 'Transcode or Direct Play' }
+    { code: '${friendly_name}', description: 'User\'s display name in Plex (e.g., "John Doe")' },
+    { code: '${total_plays}', description: 'Total number of plays/views for this user (e.g., "150")' },
+    { code: '${last_played}', description: 'Title of content currently watching or last watched (e.g., "The Matrix")' },
+    { code: '${last_played_modified}', description: 'Formatted version of last played content with season/episode info when applicable' },
+    { code: '${media_type}', description: 'Type of media being played (e.g., "Movie", "Episode", "Track")' },
+    { code: '${progress_percent}', description: 'Current playback progress percentage (e.g., "45%")' },
+    { code: '${progress_time}', description: 'Current timestamp and total duration (e.g., "1:15:30 / 2:30:00")' },
+    { code: '${is_watching}', description: 'Current activity status ("Watching", "Paused", or "Watched")' },
+    { code: '${last_seen_formatted}', description: 'Time since last activity with online indicator (e.g., "🟢" for online, "2 hours ago")' },
+    { code: '${stream_container_decision}', description: 'Stream container decision type ("transcode", "direct play", "copy")' }
   ],
   movies: [
-    { code: '${title}', description: 'Movie title' },
-    { code: '${year}', description: 'Release year' },
-    { code: '${duration}', description: 'Runtime' },
-    { code: '${content_rating}', description: 'Content rating' },
-    { code: '${video_resolution}', description: 'Video quality' },
-    { code: '${added_at_relative}', description: 'Relative time (2d ago)' },
-    { code: '${added_at_short}', description: 'Short date (Feb 10)' }
+    { code: '${title}', description: 'Movie title (e.g., "Inception")' },
+    { code: '${year}', description: 'Movie release year (e.g., "2010")' },
+    { code: '${duration}', description: 'Movie runtime in hours and minutes (e.g., "2h 28m")' },
+    { code: '${content_rating}', description: 'Content rating for the movie (e.g., "PG-13", "R")' },
+    { code: '${video_resolution}', description: 'Video quality/resolution (e.g., "1080p", "4K")' },
+    { code: '${added_at_relative}', description: 'Relative time since addition to library (e.g., "2d ago")' },
+    { code: '${added_at_short}', description: 'Short date format for addition date (e.g., "Feb 10")' }
   ],
   shows: [
-    { code: '${grandparent_title}', description: 'Show name' },
-    { code: '${parent_media_index}', description: 'Season number' },
-    { code: '${media_index}', description: 'Episode number' },
-    { code: '${title}', description: 'Episode title' },
-    { code: '${duration}', description: 'Runtime' },
-    { code: '${content_rating}', description: 'Content rating' },
-    { code: '${video_resolution}', description: 'Video quality' },
-    { code: '${added_at_relative}', description: 'Relative time (2d ago)' },
-    { code: '${added_at_short}', description: 'Short date (Feb 10)' }
+    { code: '${grandparent_title}', description: 'TV show name (e.g., "Breaking Bad")' },
+    { code: '${parent_media_index}', description: 'Season number, zero-padded (e.g., "01")' },
+    { code: '${media_index}', description: 'Episode number, zero-padded (e.g., "05")' },
+    { code: '${title}', description: 'Episode title (e.g., "Ozymandias")' },
+    { code: '${duration}', description: 'Episode runtime in hours and minutes (e.g., "48m" or "1h 20m")' },
+    { code: '${content_rating}', description: 'Content rating for the show (e.g., "TV-MA")' },
+    { code: '${video_resolution}', description: 'Video quality/resolution (e.g., "1080p", "4K")' },
+    { code: '${added_at_relative}', description: 'Relative time since addition to library (e.g., "2d ago")' },
+    { code: '${added_at_short}', description: 'Short date format for addition date (e.g., "Feb 10")' }
   ],
   music: [
-    { code: '${parent_title}', description: 'Artist name' },
-    { code: '${title}', description: 'Album title' },
-    { code: '${year}', description: 'Release year' },
-    { code: '${studio}', description: 'Record label/Studio' },
-    { code: '${genres}', description: 'Music genres' },
-    { code: '${added_at_relative}', description: 'Relative time (2d ago)' },
-    { code: '${added_at_short}', description: 'Short date (Feb 10)' }
+    { code: '${parent_title}', description: 'Artist name (e.g., "Pink Floyd")' },
+    { code: '${title}', description: 'Album or track title (e.g., "Dark Side of the Moon")' },
+    { code: '${year}', description: 'Release year of the album (e.g., "1973")' },
+    { code: '${studio}', description: 'Record label or studio (e.g., "Columbia Records")' },
+    { code: '${genres}', description: 'Music genre(s) (e.g., "Progressive Rock, Psychedelic")' },
+    { code: '${added_at_relative}', description: 'Relative time since addition to library (e.g., "2d ago")' },
+    { code: '${added_at_short}', description: 'Short date format for addition date (e.g., "Feb 10")' }
   ]
 };
 
@@ -313,9 +315,10 @@ export function generateMediaMappings(length, hasAdditionalField = false) {
  * @param {Object} formatFields - Format field settings
  * @param {Object} mappingLengths - Number of mappings for each type
  * @param {string} localIp - Local IP address
+ * @param {string} port - Custom port from configuration
  * @returns {string} Generated YAML configuration
  */
-export function generateActivityYaml(formatFields, mappingLengths, localIp) {
+export function generateActivityYaml(formatFields, mappingLengths, localIp, port) {
   if (!formatFields || !formatFields.users || !Array.isArray(formatFields.users)) {
     return "";
   }
@@ -326,8 +329,10 @@ export function generateActivityYaml(formatFields, mappingLengths, localIp) {
     return '';
   }
 
-  // Ensure localIp is a string
-  const ipAddress = localIp && typeof localIp === 'string' ? localIp : '127.0.0.1';
+  // Validate Homepage IP - return error message if not provided
+  if (!localIp || typeof localIp !== 'string' || localIp.trim() === '') {
+    return '# No Homepage IP configured. Please set Homepage IP in the Setup tab.';
+  }
   
   // Ensure users count is a number
   const userCount = mappingLengths && typeof mappingLengths === 'object' && mappingLengths.users ? 
@@ -339,7 +344,7 @@ export function generateActivityYaml(formatFields, mappingLengths, localIp) {
          id: list
          widgets:
            - type: customapi
-             url: http://${ipAddress}:3010/api/users
+             url: http://${localIp}:${port}/api/users
              method: GET
              display: list
              mappings:
@@ -357,6 +362,7 @@ ${mappings}`;
  * @param {boolean} [combineSections=false] - Whether to combine sections
  * @param {boolean} [showCount=false] - Whether to show counts
  * @param {boolean} [useFormattedNumbers=true] - Whether to use formatted numbers
+ * @param {string} port - Custom port from configuration
  * @returns {string} Generated YAML configuration
  */
 export function generateRecentMediaYaml(
@@ -367,8 +373,14 @@ export function generateRecentMediaYaml(
   localIp,
   combineSections = false,
   showCount = false,
-  useFormattedNumbers = true
+  useFormattedNumbers = true,
+  port
 ) {
+  // Validate Homepage IP - return error message if not provided
+  if (!localIp || typeof localIp !== 'string' || localIp.trim() === '') {
+    return '# No Homepage IP configured. Please set Homepage IP in the Setup tab.';
+  }
+  
   const yaml = [];
   const valueParam = useFormattedNumbers ? '_formatted' : '';
   
@@ -409,7 +421,7 @@ export function generateRecentMediaYaml(
         id: list
         widgets:
           - type: customapi
-            url: http://${localIp}:3010/api/media/recent?type=movies&section=${movieSectionIds}
+            url: http://${localIp}:${port}/api/media/recent?type=movies&section=${movieSectionIds}
             method: GET
             display: list
             mappings:
@@ -418,7 +430,7 @@ ${mappings}`;
         if (showCount) {
           movieYaml += `
           - type: customapi
-            url: http://${localIp}:3010/api/media/recent
+            url: http://${localIp}:${port}/api/media/recent
             method: GET
             display: block
             mappings:
@@ -456,7 +468,7 @@ ${mappings}`;
         id: list
         widgets:
           - type: customapi
-            url: http://${localIp}:3010/api/media/recent?type=shows&section=${showSectionIds}
+            url: http://${localIp}:${port}/api/media/recent?type=shows&section=${showSectionIds}
             method: GET
             display: list
             mappings:
@@ -465,7 +477,7 @@ ${mappings}`;
         if (showCount) {
           showYaml += `
           - type: customapi
-            url: http://${localIp}:3010/api/media/recent
+            url: http://${localIp}:${port}/api/media/recent
             method: GET
             display: block
             mappings:
@@ -517,7 +529,7 @@ ${mappings}`;
         id: list
         widgets:
           - type: customapi
-            url: http://${localIp}:3010/api/media/recent?type=music&section=${musicSectionIds}
+            url: http://${localIp}:${port}/api/media/recent?type=music&section=${musicSectionIds}
             method: GET
             display: list
             mappings:
@@ -526,7 +538,7 @@ ${mappings}`;
         if (showCount) {
           musicYaml += `
           - type: customapi
-            url: http://${localIp}:3010/api/media/recent
+            url: http://${localIp}:${port}/api/media/recent
             method: GET
             display: block
             mappings:
@@ -588,7 +600,7 @@ ${mappings}`;
         id: list
         widgets:
           - type: customapi
-            url: http://${localIp}:3010/api/media/recent?type=movies&section=${sectionId}
+            url: http://${localIp}:${port}/api/media/recent?type=movies&section=${sectionId}
             method: GET
             display: list
             mappings:
@@ -597,7 +609,7 @@ ${mappings}`;
           if (showCount) {
             sectionYaml += `
           - type: customapi
-            url: http://${localIp}:3010/api/media/recent
+            url: http://${localIp}:${port}/api/media/recent
             method: GET
             display: block
             mappings:
@@ -645,7 +657,7 @@ ${mappings}`;
         id: list
         widgets:
           - type: customapi
-            url: http://${localIp}:3010/api/media/recent?type=shows&section=${sectionId}
+            url: http://${localIp}:${port}/api/media/recent?type=shows&section=${sectionId}
             method: GET
             display: list
             mappings:
@@ -654,7 +666,7 @@ ${mappings}`;
           if (showCount) {
             sectionYaml += `
           - type: customapi
-            url: http://${localIp}:3010/api/media/recent
+            url: http://${localIp}:${port}/api/media/recent
             method: GET
             display: block
             mappings:
@@ -716,7 +728,7 @@ ${mappings}`;
         id: list
         widgets:
           - type: customapi
-            url: http://${localIp}:3010/api/media/recent?type=music&section=${sectionId}
+            url: http://${localIp}:${port}/api/media/recent?type=music&section=${sectionId}
             method: GET
             display: list
             mappings:
@@ -725,7 +737,7 @@ ${mappings}`;
           if (showCount) {
             sectionYaml += `
           - type: customapi
-            url: http://${localIp}:3010/api/media/recent
+            url: http://${localIp}:${port}/api/media/recent
             method: GET
             display: block
             mappings:
@@ -770,6 +782,7 @@ ${mappings}`;
  * @param {string} localIp - Local IP address
  * @param {boolean} showIndividualCounts - Whether to show individual counts
  * @param {boolean} useFormattedNumbers - Whether to use formatted numbers
+ * @param {string} port - Custom port from configuration
  * @returns {string} Generated YAML configuration
  */
 export function generateMediaCountYaml(
@@ -777,8 +790,14 @@ export function generateMediaCountYaml(
   libraryNames, 
   localIp, 
   showIndividualCounts, 
-  useFormattedNumbers
+  useFormattedNumbers,
+  port
 ) {
+  // Validate Homepage IP - return error message if not provided
+  if (!localIp || typeof localIp !== 'string' || localIp.trim() === '') {
+    return '# No Homepage IP configured. Please set Homepage IP in the Setup tab.';
+  }
+  
   const valueParam = useFormattedNumbers ? '_formatted' : '';
   
   // Extract and normalize section IDs
@@ -810,7 +829,7 @@ export function generateMediaCountYaml(
         yaml.push(`    - ${sectionName}:
          widgets:
            - type: customapi
-             url: http://${localIp}:3010/api/media/recent
+             url: http://${localIp}:${port}/api/media/recent
              method: GET
              display: block
              mappings:
@@ -842,7 +861,7 @@ export function generateMediaCountYaml(
         yaml.push(`    - ${sectionName}:
          widgets:
            - type: customapi
-             url: http://${localIp}:3010/api/media/recent
+             url: http://${localIp}:${port}/api/media/recent
              method: GET
              display: block
              mappings:
@@ -888,7 +907,7 @@ export function generateMediaCountYaml(
         yaml.push(`    - ${sectionName}:
          widgets:
            - type: customapi
-             url: http://${localIp}:3010/api/media/recent
+             url: http://${localIp}:${port}/api/media/recent
              method: GET
              display: block
              mappings:
@@ -923,7 +942,7 @@ export function generateMediaCountYaml(
     - Movies:
          widgets:
            - type: customapi
-             url: http://${localIp}:3010/api/media/recent
+             url: http://${localIp}:${port}/api/media/recent
              method: GET
              display: block
              mappings:
@@ -938,7 +957,7 @@ export function generateMediaCountYaml(
     - Shows:
          widgets:
            - type: customapi
-             url: http://${localIp}:3010/api/media/recent
+             url: http://${localIp}:${port}/api/media/recent
              method: GET
              display: block
              mappings:
@@ -967,34 +986,34 @@ export function generateMediaCountYaml(
     // Add Music section if we have music sections
     if (musicSections.length > 0) {
       yaml += `
-        - Music:
-             widgets:
-               - type: customapi
-                 url: http://${localIp}:3010/api/media/recent
-                 method: GET
-                 display: block
-                 mappings:
-                 - field:
-                     response:
-                       libraries:
-                         totals:
-                           music: total_items${valueParam}
-                   format: numbers
-                   label: Artists
-                 - field:
-                     response:
-                       libraries:
-                         totals:
-                           music: total_albums${valueParam}
-                   format: numbers
-                   label: Albums
-                 - field:
-                     response:
-                       libraries:
-                         totals:
-                           music: total_tracks${valueParam}
-                   format: numbers
-                   label: Tracks`;
+    - Music:
+         widgets:
+           - type: customapi
+             url: http://${localIp}:${port}/api/media/recent
+             method: GET
+             display: block
+             mappings:
+             - field:
+                 response:
+                   libraries:
+                     totals:
+                       music: total_items${valueParam}
+               format: numbers
+               label: Artists
+             - field:
+                 response:
+                   libraries:
+                     totals:
+                       music: total_albums${valueParam}
+               format: numbers
+               label: Albums
+             - field:
+                 response:
+                   libraries:
+                     totals:
+                       music: total_tracks${valueParam}
+               format: numbers
+               label: Tracks`;
     }
     
     return yaml;

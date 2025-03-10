@@ -1,4 +1,5 @@
 Project Folder
+│   .dockerignore
 │   Dockerfile
 │   logger.js
 │   package.json
@@ -7,13 +8,29 @@ Project Folder
 │
 ├───backend
 │   ├───api
-│   │       media.js
-│   │       users.js
+│   │   │   debug.js
+│   │   │   media.js
+│   │   │   users.js
+│   │   │   webhook.js
+│   │   │
+│   │   └───debug
+│   │           debugCache.js
+│   │           debugDashboard.js
+│   │           debugLogging.js
+│   │           debugLogs.js
+│   │           debugRouter.js
+│   │           debugSettings.js
+│   │           debugUtils.js
 │   │
 │   └───services
+│           cacheConfig.js
+│           cacheDataFetchers.js
 │           cacheService.js
+│           fix-background-refresh.js
+│           PersistentCache.js
 │           settings.js
 │           tautulli.js
+│           webhookService.js
 │
 ├───config
 │       defaults.json
@@ -77,6 +94,7 @@ Project Folder
 │       │
 │       ├───hooks
 │       │       useBackgroundRefresh.js
+│       │       useSharedData.js
 │       │
 │       ├───services
 │       │       tautulli.js

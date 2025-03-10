@@ -181,7 +181,7 @@ const UnifiedFormatManager = ({ onError, onSuccess }) => {
       
       // Set configuration data for homepage
       setBaseUrl(configData.baseUrl || '');
-      setLocalIp(configData.localIp || '');
+      setLocalIp(configData.homepageIp || '');
       setPort(configData.port || '3010');
       
       // Get library names from media recent data
@@ -448,6 +448,7 @@ const UnifiedFormatManager = ({ onError, onSuccess }) => {
           mediaFormats={mediaFormats}
           userFields={userFields}
           localIp={localIp}
+		  port={port}
         />
       )}
     </div>

@@ -3,8 +3,8 @@
  * Generates YAML configurations for Homepage integration
  * @module components/managers/HomepageConfigManager
  */
-import React, { useState } from 'react';
-import { Copy, Check, Monitor, Hash, Layers } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Copy, Check, Monitor, Hash, Layers, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '../ui/UIComponents';
 import { 
   generateActivityYaml, 
@@ -61,6 +61,7 @@ const ConfigSection = ({ title, yaml, section, copiedSection, copyToClipboard })
  * @param {Object} props.mediaFormats - Media format configurations
  * @param {Array} props.userFields - User format fields
  * @param {string} props.localIp - Local IP address
+ * @param {string} props.port - Custom port from configuration
  * @returns {JSX.Element} Rendered component
  */
 const HomepageConfigManager = ({ 
@@ -68,17 +69,18 @@ const HomepageConfigManager = ({
   libraryNames, 
   mediaFormats, 
   userFields,
-  localIp
+  localIp,
+  port
 }) => {
   /**
    * Number of items to include in each mapping
    * @type {[{users: number, movies: number, shows: number, music: number}, Function]}
    */
   const [mappingLengths, setMappingLengths] = useState({
-    users: 15,
-    movies: 15,
-    shows: 15,
-    music: 15
+    users: 1,
+    movies: 1,
+    shows: 1,
+    music: 1
   });
   
   /**
@@ -159,18 +161,20 @@ const HomepageConfigManager = ({
   const activityConfig = generateActivityYaml(
     { users: userFields }, 
     mappingLengths, 
-    localIp
+    localIp,
+    port
   );
   
   const recentMediaConfig = generateRecentMediaYaml(
     processedSectionTypes, 
-    mediaFormats, 
+    mediaFormats,
     libraryNames, 
     mappingLengths, 
     localIp,
     combineSections,
     showCount,
-    useFormattedNumbers
+    useFormattedNumbers,
+    port
   );
   
   const mediaCountConfig = generateMediaCountYaml(
@@ -178,11 +182,24 @@ const HomepageConfigManager = ({
     libraryNames, 
     localIp, 
     showIndividualCounts, 
-    useFormattedNumbers
+    useFormattedNumbers,
+    port
   );
 
   return (
     <div className="space-y-6">
+      {!localIp && (
+        <Alert className="alert alert-warning mb-4">
+          <AlertDescription className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            <span>
+              <strong>No Homepage IP configured.</strong> Please set a Homepage IP in the Setup tab for
+              the YAML configuration to work properly. Homepage integration requires a valid IP address.
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <div className="dark-panel">
         <div className="table-header">
           <h3 className="header-text">Display Settings</h3>
@@ -334,7 +351,7 @@ const HomepageConfigManager = ({
       <Alert className="alert alert-info">
         <AlertDescription>
           Below are example Homepage configurations based on your current section settings.
-          URLs are automatically configured using your Tautulli base URL.
+          URLs are automatically configured using your Homepage IP.
         </AlertDescription>
       </Alert>
 

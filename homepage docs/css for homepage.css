@@ -1,19 +1,56 @@
-/*==================================
-  LIST STYLES
-==================================*/
+/*================================== LIST STYLES ==================================*/
 /* Recently Added/Activity Section */
+
+/* Base styles (original) */
 #list > div > div.relative.flex.flex-row.w-full.service-container > div > div {
   display: block;
   text-align: right;
 }
 
-
 #list > div > div.relative.flex.flex-row.w-full.service-container > div > div > div.flex.flex-row.text-right > div:nth-child(1) {
   text-align: right;
-  margin-left: .5rem;
+  margin-left: 0.5rem;
 }
 
 #list > div > div.relative.flex.flex-row.w-full.service-container > div > div > div.flex.flex-row.text-right > div:nth-child(2) {
   text-align: left;
-  margin-left: auto; 
+  margin-left: auto;
+}
+
+/* Responsive styles for tablets and mobile devices */
+@media screen and (max-width: 768px) {
+  /* Change flex direction for better mobile layout */
+  #list > div > div.relative.flex.flex-row.w-full.service-container {
+    flex-direction: column;
+  }
+  
+  #list > div > div.relative.flex.flex-row.w-full.service-container > div > div {
+    width: 100%;
+    text-align: center;
+    padding: 0.75rem 0;
+  }
+  
+  #list > div > div.relative.flex.flex-row.w-full.service-container > div > div > div.flex.flex-row.text-right {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  #list > div > div.relative.flex.flex-row.w-full.service-container > div > div > div.flex.flex-row.text-right > div:nth-child(1) {
+    text-align: center;
+    margin-left: 0;
+  }
+  
+  #list > div > div.relative.flex.flex-row.w-full.service-container > div > div > div.flex.flex-row.text-right > div:nth-child(2) {
+    text-align: center;
+    margin-left: 0;
+  }
+}
+
+/* Extra small devices */
+@media screen and (max-width: 480px) {
+  #list > div > div.relative.flex.flex-row.w-full.service-container > div > div {
+    padding: 0.5rem;
+    font-size: 0.9rem; /* Slightly smaller font for very small screens */
+  }
 }
