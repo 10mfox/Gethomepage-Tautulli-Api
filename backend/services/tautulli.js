@@ -10,19 +10,22 @@ const { cache } = require('./cacheService');
  * Retry delay in milliseconds
  * @type {number}
  */
-const RETRY_DELAY = 1000; // Reduced from 2000ms
+// CHANGE: Increased from 1000ms to 2000ms for better recovery
+const RETRY_DELAY = 2000;
 
 /**
  * Maximum number of retry attempts for API requests
  * @type {number}
  */
-const MAX_RETRIES = 2; // Reduced from 3
+// CHANGE: Increased from 2 to 3 retries
+const MAX_RETRIES = 3;
 
 /**
  * Request timeout in milliseconds
  * @type {number}
  */
-const DEFAULT_TIMEOUT = 5000; // Reduced from 10000ms
+// CHANGE: Increased from 5000ms to 15000ms
+const DEFAULT_TIMEOUT = 15000;
 
 /**
  * Enhanced service for interacting with Tautulli API
@@ -366,7 +369,7 @@ class TautulliService {
             break;
           }
 
-          // Wait before retrying with exponential backoff
+          // CHANGE: Improved backoff strategy with exponential backoff
           const backoffDelay = RETRY_DELAY * Math.pow(1.5, attempt - 1);
           await new Promise(resolve => setTimeout(resolve, backoffDelay));
         }
@@ -419,7 +422,8 @@ class TautulliService {
   async batchRequests(requests, options = {}) {
     const { 
       maxConcurrent = 5,
-      timeout = 8000 // Reduced from 15000ms
+      // CHANGE: Increased timeout from 8000ms to 15000ms
+      timeout = 15000
     } = options;
     
     // Group requests to process in batches
@@ -450,7 +454,8 @@ class TautulliService {
       
       // Add a small delay between batches to avoid overloading the server
       if (batches.length > 1) {
-        await new Promise(resolve => setTimeout(resolve, 100)); // Reduced from 300ms
+        // CHANGE: Increased from 100 to 300ms for more breathing room between batches
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
     }
     
@@ -538,7 +543,8 @@ class TautulliService {
       const response = await this.makeRequest('get_activity', {}, {
         deduplicate: true,
         useConditionalGet: true,
-        timeout: 3000 // Fast timeout for active sessions
+        // CHANGE: Increased from 3000 to 8000ms
+        timeout: 8000
       });
       
       return response?.response?.data?.sessions || [];

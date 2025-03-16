@@ -1,5 +1,5 @@
-# Build stage
-FROM node:18-alpine AS builder
+# Build stage - Uses the platform argument for multi-architecture support
+FROM --platform=$BUILDPLATFORM node:18-alpine AS builder
 
 # Important: Do NOT set NODE_ENV=production for the build stage
 # We need development dependencies to build the React app
@@ -20,7 +20,7 @@ COPY . .
 # Build frontend
 RUN cd frontend && npm run build
 
-# Production stage
+# Production stage - No need to specify platform as it uses target platform by default
 FROM node:18-alpine
 
 # Set production environment for the final image
