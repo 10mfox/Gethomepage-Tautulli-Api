@@ -1,12 +1,6 @@
-### <div align="center">![android-chrome-192x192](https://github.com/user-attachments/assets/9eadcd5b-1f28-4cb9-909e-55d277ded69a)</div>
-
-# <div align="center">Tautulli Unified Manager</div>
+# Tautulli Unified Manager
 
 A comprehensive web application that provides a centralized interface for monitoring Plex media server activities through Tautulli. This application combines user activity monitoring, media format management, and library statistics with an intuitive interface featuring multiple theme options and customizable display formats.
-
-
-https://github.com/user-attachments/assets/dd493ddc-74ad-4f15-80db-d07fbf2630c9
-
 
 ## Features
 
