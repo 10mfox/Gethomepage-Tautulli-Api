@@ -25,9 +25,10 @@ export const Nav = ({ leftItems, rightItems, activeView, onViewChange }) => {
       <div className="nav-content">
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-8">
-            <Link to="/" className="text-xl font-semibold text-white">
+            <div className="flex items-center text-xl font-semibold text-white">
+              <img src="/favicon.ico" alt="Tautulli" className="h-6 w-6 mr-2" />
               Tautulli Manager
-            </Link>
+            </div>
             
             {/* Left Navigation */}
             <div className="flex gap-8">
