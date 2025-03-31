@@ -61,7 +61,7 @@ class TautulliService {
     
     // Connection pool for better connection reuse
     this.connectionPool = {
-      maxSize: 10,  // Maximum connections to keep open
+      maxSize: 44,  // Maximum connections to keep open
       idle: [],     // Idle connections
       active: 0     // Currently active connections
     };
@@ -70,7 +70,7 @@ class TautulliService {
     this.commandQueue = [];
     this.isProcessingQueue = false;
     this.commandRateLimits = {
-      'get_activity': { max: 2, interval: 5000, current: 0, lastReset: Date.now() },
+      'get_activity': { max: 25, interval: 5000, current: 0, lastReset: Date.now() },
       'get_users_table': { max: 2, interval: 5000, current: 0, lastReset: Date.now() },
       'get_recently_added': { max: 5, interval: 5000, current: 0, lastReset: Date.now() },
       'get_libraries_table': { max: 2, interval: 5000, current: 0, lastReset: Date.now() },

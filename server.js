@@ -37,38 +37,38 @@ function getLocalIpAddress() {
   return '127.0.0.1';
 }
 
-// Request tracking for rate limiting
-const requestTracker = {
-  requests: {},
-  rateLimit: 60, // requests per minute
-  resetInterval: 60000, // 1 minute
-  
-  // Check if a new request is allowed
-  checkLimit(routePath) {
-    const now = Date.now();
-    const minute = Math.floor(now / this.resetInterval);
-    
-    // Create bucket for this minute if not exists
-    if (!this.requests[minute]) {
-      // Clean up old buckets
-      const oldKeys = Object.keys(this.requests).filter(k => parseInt(k) < minute);
-      oldKeys.forEach(k => delete this.requests[k]);
-      
-      // Create new bucket
-      this.requests[minute] = {};
-    }
-    
-    // Check/increment counter for this route
-    const count = this.requests[minute][routePath] || 0;
-    if (count >= this.rateLimit) {
-      return false;
-    }
-    
-    // Increment
-    this.requests[minute][routePath] = count + 1;
-    return true;
-  }
-};
+// Request tracking for rate limiting - DISABLED
+// const requestTracker = {
+//   requests: {},
+//   rateLimit: 21, // requests per minute
+//   resetInterval: 60000, // 1 minute
+//   
+//   // Check if a new request is allowed
+//   checkLimit(routePath) {
+//     const now = Date.now();
+//     const minute = Math.floor(now / this.resetInterval);
+//     
+//     // Create bucket for this minute if not exists
+//     if (!this.requests[minute]) {
+//       // Clean up old buckets
+//       const oldKeys = Object.keys(this.requests).filter(k => parseInt(k) < minute);
+//       oldKeys.forEach(k => delete this.requests[k]);
+//       
+//       // Create new bucket
+//       this.requests[minute] = {};
+//     }
+//     
+//     // Check/increment counter for this route
+//     const count = this.requests[minute][routePath] || 0;
+//     if (count >= this.rateLimit) {
+//       return false;
+//     }
+//     
+//     // Increment
+//     this.requests[minute][routePath] = count + 1;
+//     return true;
+//   }
+// };
 
 const app = express();
 const PORT = process.env.TAUTULLI_CUSTOM_PORT || 3010;
@@ -101,25 +101,25 @@ app.use(compression({
 app.use(express.json());
 
 /**
- * Rate limiting middleware
+ * Rate limiting middleware - DISABLED
  * Prevents excessive API requests
  */
-app.use((req, res, next) => {
-  // Only apply to API routes
-  if (req.path.startsWith('/api/')) {
-    // Check if request should be allowed
-    if (!requestTracker.checkLimit(req.path)) {
-      // Return 429 Too Many Requests
-      return res.status(429).json({
-        response: {
-          result: 'error',
-          message: 'Too many requests to this endpoint, please try again later'
-        }
-      });
-    }
-  }
-  next();
-});
+// app.use((req, res, next) => {
+//   // Only apply to API routes
+//   if (req.path.startsWith('/api/')) {
+//     // Check if request should be allowed
+//     if (!requestTracker.checkLimit(req.path)) {
+//       // Return 429 Too Many Requests
+//       return res.status(429).json({
+//         response: {
+//           result: 'error',
+//           message: 'Too many requests to this endpoint, please try again later'
+//         }
+//       });
+//     }
+//   }
+//   next();
+// });
 
 /**
  * Cache control middleware

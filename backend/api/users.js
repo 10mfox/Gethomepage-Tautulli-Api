@@ -63,11 +63,21 @@ function formatTimeHHMM(totalSeconds) {
  */
 function formatShowTitle(session) {
   if (!session) return '';
+  
+  // Format TV shows with season/episode info
   if (session.grandparent_title && session.parent_media_index && session.media_index) {
     // Remove year from grandparent_title (show name)
     const showTitle = session.grandparent_title.replace(/\s*\(\d{4}\)|\s+[-–]\s+\d{4}/, '');
     return `${showTitle} - S${String(session.parent_media_index).padStart(2, '0')}E${String(session.media_index).padStart(2, '0')}`;
   }
+  
+  // Handle movies or TV shows without season/episode info
+  if (session.grandparent_title && session.title) {
+    // This is likely a TV show episode without season/episode numbers
+    return `${session.grandparent_title} - ${session.title}`;
+  }
+  
+  // Fall back to just the title
   const title = session.title || '';
   return title.replace(/\s*\(\d{4}\)|\s+[-–]\s+\d{4}/, '');
 }

@@ -46,7 +46,7 @@ const ConfigSection = ({ title, yaml, section, copiedSection, copyToClipboard })
     </div>
     <div className="p-4">
       <pre className="code-block">
-        <code className="text-gray-300 whitespace-pre">{yaml}</code>
+        <code className="text-green-400 whitespace-pre">{yaml}</code>
       </pre>
     </div>
   </div>
