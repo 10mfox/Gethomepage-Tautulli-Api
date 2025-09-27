@@ -2,156 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Theme Variables */
-:root[data-theme="dark"] {
-  --primary: 37 99 235;
-  --primary-light: 59 130 246;
-  --primary-dark: 29 78 216;
-  --accent: 34 211 238;
-  --accent-light: 45 212 191;
-  --accent-dark: 17 94 89;
-  --background: 0 0 0;
-  --panel: 0 0 0;
-  --text: 255 255 255;
-  --text-secondary: 156 163 175;
-  --border: 255 255 255;
-  
-  /* Default transparency values */
-  --panel-opacity: 0.2;
-  --navbar-opacity: 0.2;
-  --footer-opacity: 0.2;
-  --backdrop-opacity: 0.6;
-}
-
-:root[data-theme="cyberpunk"] {
-  --primary: 236 72 153;
-  --primary-light: 244 114 182;
-  --primary-dark: 219 39 119;
-  --accent: 34 211 238;
-  --accent-light: 45 212 191;
-  --accent-dark: 17 94 89;
-  --background: 0 0 0;
-  --panel: 0 0 0;
-  --text: 255 255 255;
-  --text-secondary: 156 163 175;
-  --border: 255 255 255;
-}
-
-:root[data-theme="matrix"] {
-  --primary: 34 197 94;
-  --primary-light: 74 222 128;
-  --primary-dark: 22 163 74;
-  --accent: 16 185 129;
-  --accent-light: 20 184 166;
-  --accent-dark: 13 148 136;
-  --background: 0 0 0;
-  --panel: 0 0 0;
-  --text: 255 255 255;
-  --text-secondary: 156 163 175;
-  --border: 255 255 255;
-}
-
-:root[data-theme="synthwave"] {
-  --primary: 147 51 234;
-  --primary-light: 168 85 247;
-  --primary-dark: 126 34 206;
-  --accent: 236 72 153;
-  --accent-light: 244 114 182;
-  --accent-dark: 219 39 119;
-  --background: 0 0 0;
-  --panel: 0 0 0;
-  --text: 255 255 255;
-  --text-secondary: 156 163 175;
-  --border: 255 255 255;
-}
-
-:root[data-theme="crimson"] {
-  --primary: 239 68 68;
-  --primary-light: 248 113 113;
-  --primary-dark: 220 38 38;
-  --accent: 249 115 22;
-  --accent-light: 251 146 60;
-  --accent-dark: 234 88 12;
-  --background: 0 0 0;
-  --panel: 0 0 0;
-  --text: 255 255 255;
-  --text-secondary: 156 163 175;
-  --border: 255 255 255;
-}
-
-:root[data-theme="ocean"] {
-  --primary: 34 211 238;
-  --primary-light: 45 212 191;
-  --primary-dark: 17 94 89;
-  --accent: 37 99 235;
-  --accent-light: 59 130 246;
-  --accent-dark: 29 78 216;
-  --background: 0 0 0;
-  --panel: 0 0 0;
-  --text: 255 255 255;
-  --text-secondary: 156 163 175;
-  --border: 255 255 255;
-}
-
-:root[data-theme="forest"] {
-  --primary: 16 185 129;
-  --primary-light: 20 184 166;
-  --primary-dark: 13 148 136;
-  --accent: 34 197 94;
-  --accent-light: 74 222 128;
-  --accent-dark: 22 163 74;
-  --background: 0 0 0;
-  --panel: 0 0 0;
-  --text: 255 255 255;
-  --text-secondary: 156 163 175;
-  --border: 255 255 255;
-}
-
-:root[data-theme="sunset"] {
-  --primary: 249 115 22;
-  --primary-light: 251 146 60;
-  --primary-dark: 234 88 12;
-  --accent: 234 179 8;
-  --accent-light: 250 204 21;
-  --accent-dark: 202 138 4;
-  --background: 0 0 0;
-  --panel: 0 0 0;
-  --text: 255 255 255;
-  --text-secondary: 156 163 175;
-  --border: 255 255 255;
-}
-
-:root[data-theme="midnight"] {
-  --primary: 79 70 229;
-  --primary-light: 99 102 241;
-  --primary-dark: 67 56 202;
-  --accent: 139 92 246;
-  --accent-light: 167 139 250;
-  --accent-dark: 124 58 237;
-  --background: 0 0 0;
-  --panel: 0 0 0;
-  --text: 255 255 255;
-  --text-secondary: 156 163 175;
-  --border: 255 255 255;
-}
-
-:root[data-theme="monochrome"] {
-  --primary: 107 114 128;
-  --primary-light: 156 163 175;
-  --primary-dark: 75 85 99;
-  --accent: 71 85 105;
-  --accent-light: 100 116 139;
-  --accent-dark: 51 65 85;
-  --background: 0 0 0;
-  --panel: 0 0 0;
-  --text: 255 255 255;
-  --text-secondary: 156 163 175;
-  --border: 255 255 255;
-}
-
 @layer base {
   :root {
     color-scheme: dark;
+    
+    /* Default theme variables */
+    --primary: 37 99 235;
+    --primary-light: 59 130 246;
+    --primary-dark: 29 78 216;
+    --accent: 34 211 238;
+    --accent-light: 45 212 191;
+    --accent-dark: 17 94 89;
+    --background: 0 0 0;
+    --panel: 0 0 0;
+    --text: 255 255 255;
+    --text-secondary: 156 163 175;
+    --border: 255 255 255;
+    
+    /* Default transparency values */
+    --panel-opacity: 0.2;
+    --navbar-opacity: 0.2;
+    --footer-opacity: 0.2;
+    --backdrop-opacity: 0.6;
   }
 
   body {

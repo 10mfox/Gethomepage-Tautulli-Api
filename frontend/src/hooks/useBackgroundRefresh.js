@@ -29,6 +29,7 @@ export const useBackgroundRefresh = (fetchFn, initialInterval = null, isUserData
   const fetchingRef = useRef(false);
   const requestCountRef = useRef(0);
   const lastRequestTimeRef = useRef(Date.now());
+  const fetchErrorCountRef = useRef(0); // Track consecutive fetch errors
 
   // Fetch server refresh interval on hook initialization
   useEffect(() => {
@@ -40,6 +41,11 @@ export const useBackgroundRefresh = (fetchFn, initialInterval = null, isUserData
             'Pragma': 'no-cache'
           }
         });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`);
+        }
+        
         const config = await response.json();
         if (config.refreshInterval) {
           console.log(`Server configured refresh interval: ${config.refreshInterval}ms`);
@@ -123,27 +129,48 @@ export const useBackgroundRefresh = (fetchFn, initialInterval = null, isUserData
     try {
       fetchingRef.current = true;
       console.log('Fetching data...');
-      const result = await fetchFn();
       
-      // Only update if data has changed or force refresh
-      if (!isEqual(result, previousDataRef.current) || force) {
-        console.log('Data changed, updating state');
-        setData(result);
-        previousDataRef.current = result;
-        setLastUpdated(new Date());
-      } else {
-        console.log('No data changes detected');
+      // Only show loading indicator on first load when we have no data
+      // This prevents UI flicker on refresh attempts
+      if (!previousDataRef.current && !data) {
+        setLoading(true);
       }
       
-      setError(null);
+      const result = await fetchFn();
+      
+      // CRITICAL: Check if the result is valid and not empty
+      if (result && (Array.isArray(result) ? result.length > 0 : Object.keys(result).length > 0)) {
+        // Only update if data has changed or force refresh
+        if (!isEqual(result, previousDataRef.current) || force) {
+          console.log('Data changed, updating state');
+          setData(result);
+          previousDataRef.current = result;
+          setLastUpdated(new Date());
+        } else {
+          console.log('No data changes detected');
+        }
+        
+        setError(null);
+        fetchErrorCountRef.current = 0; // Reset error counter on success
+      } else {
+        console.log('Fetch returned empty result, keeping previous data');
+        // Don't update the state, keep showing previous data
+        throw new Error('Empty data received');
+      }
     } catch (err) {
       console.error('Background refresh error:', err);
-      setError(err.message);
+      setError(err.message || 'Failed to fetch data');
+      fetchErrorCountRef.current++; // Increment error counter
+      
+      // CRITICAL: Do not clear data state on error!
+      // We want to keep showing previous data
+      console.log(`Keeping previous data. Consecutive errors: ${fetchErrorCountRef.current}`);
+      
     } finally {
       setLoading(false);
       fetchingRef.current = false;
     }
-  }, [fetchFn, isUserData]);
+  }, [fetchFn, isUserData, data]);
 
   // Set up initial fetch and interval
   useEffect(() => {
@@ -157,7 +184,11 @@ export const useBackgroundRefresh = (fetchFn, initialInterval = null, isUserData
       // Only trigger refresh if document is visible to save resources
       if (document.visibilityState === 'visible') {
         console.log(`Background refresh interval triggered${isUserData ? ' for user data' : ''}`);
-        fetch(false);
+        fetch(false).catch(error => {
+          // Log the error but don't stop the interval
+          console.error('Refresh interval error:', error);
+          // We'll try again on the next interval
+        });
       } else {
         console.log(`Skipping refresh - page not visible${isUserData ? ' (user data)' : ''}`);
       }
@@ -187,7 +218,10 @@ export const useBackgroundRefresh = (fetchFn, initialInterval = null, isUserData
         
         if (timeSinceUpdate > stalePeriod) {
           console.log(`Tab became visible with stale data${isUserData ? ' (user data)' : ''}, refreshing`);
-          fetch(false);
+          fetch(false).catch(error => {
+            // Log the error but don't stop the application
+            console.error('Visibility change refresh error:', error);
+          });
         } else {
           console.log(`Tab became visible but data is fresh${isUserData ? ' (user data)' : ''}, not refreshing yet`);
         }
@@ -204,7 +238,11 @@ export const useBackgroundRefresh = (fetchFn, initialInterval = null, isUserData
   // Manual refresh function
   const refresh = useCallback(() => {
     console.log(`Manual refresh triggered${isUserData ? ' for user data' : ''}`);
-    return fetch(true);
+    return fetch(true).catch(error => {
+      // Log the error but allow the application to continue
+      console.error('Manual refresh error:', error);
+      return previousDataRef.current; // Return previous data instead of null
+    });
   }, [fetch, isUserData]);
 
   return {

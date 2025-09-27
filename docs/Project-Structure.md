@@ -50,7 +50,6 @@ Project Folder
 │   │   │   android-chrome-192x192.png
 │   │   │   android-chrome-512x512.png
 │   │   │   apple-touch-icon.png
-│   │   │   backdrop.jpg
 │   │   │   favicon-16x16.png
 │   │   │   favicon-32x32.png
 │   │   │   favicon.ico
@@ -67,7 +66,6 @@ Project Folder
 │       │
 │       ├───components
 │       │   │   FormatManager.js
-│       │   │   ThemeSwitcher.js
 │       │   │
 │       │   ├───dashboard
 │       │   │       LibraryView.js
