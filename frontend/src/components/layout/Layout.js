@@ -23,9 +23,9 @@ export const Nav = ({ leftItems, rightItems, activeView, onViewChange }) => {
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-8">
-            <div className="flex-shrink-0 flex items-center">
-              <img src="/favicon.ico" alt="Logo" className="h-8 w-8 mr-3" />
-              <span className="text-xl font-bold text-white">Audiobookshelf Manager</span>
+            <div className="flex items-center text-xl font-semibold text-white">
+              <img src="/favicon.ico" alt="Tautulli" className="h-6 w-6 mr-2" />
+              Tautulli Manager
             </div>
             
             {/* Left Navigation */}
